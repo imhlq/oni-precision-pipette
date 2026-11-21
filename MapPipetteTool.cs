@@ -396,7 +396,13 @@ namespace OniPrecision
                 cursorPipe = overlay.mode == OverlayModes.GasConduits.ID || overlay.mode == OverlayModes.LiquidConduits.ID;
                 if (cursorPipe && !InFlight)
                 {
-                    RestoreDose(overlay.mode == OverlayModes.GasConduits.ID ? FluidPhase.Gas : FluidPhase.Liquid);
+                    var phase = overlay.mode == OverlayModes.GasConduits.ID ? FluidPhase.Gas : FluidPhase.Liquid;
+                    if (!Unlocked(ToolTech(phase)))
+                    {
+                        ChangeView(false);
+                        return;
+                    }
+                    RestoreDose(phase);
                     SelectReservoir(cursorPhase);
                 }
             }

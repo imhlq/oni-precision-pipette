@@ -6,11 +6,11 @@ Move a measured sample of liquid or gas between a map cell and a conduit in *Oxy
 
 ## Install
 
-For U60, game build **763796** or later. Exit the game, extract `YAPP-install.zip`, and copy the **OniPrecision** folder into `mods/Local` in your ONI user-data directory. On Windows this is usually `Documents\Klei\OxygenNotIncluded\mods\Local`. Enable **Yet Another Precision Pipette** in the Mods menu and restart when prompted.
+For U60, game build **763796** or later. Exit the game, extract `YAPP-install.zip`, and copy the **OniPrecision** folder into `mods/Local` in your ONI user-data directory. On Windows this is usually `Documents\Klei\OxygenNotIncluded\mods\Local`. Enable **又一款精准滴管（YAPP）** (listed as **Yet Another Precision Pipette** in v0.15.0) in the Mods menu and restart when prompted.
 
 ## Take a sample
 
-Choose **Plumbing → Liquid Pipette** or **Ventilation → Gas Pipette**. Both tools are available immediately in this version. The native hover card shows what is in the target cell; the separate sample readout shows the element, mass, and temperature in the pipette.
+Choose **Plumbing → Liquid Pipette** or **Ventilation → Gas Pipette**. In the current source, each tool unlocks with its corresponding conduit research (`LiquidPiping` or `GasPiping`). The linked v0.15.0 release predates these research gates. The native hover card shows what is in the target cell; the separate sample readout shows the element, mass, and temperature in the pipette.
 
 | Control | Action |
 | --- | --- |
@@ -19,7 +19,7 @@ Choose **Plumbing → Liquid Pipette** or **Ventilation → Gas Pipette**. Both 
 | Tab / backquote | Toggle the matching conduit overlay / return to the map. You can switch between pickup and delivery. |
 | Esc | Leave the tool and keep the sample. |
 
-Enable **Same element only** to limit delivery to empty or matching targets. Turn it off to drip liquid into air. Samples keep their original temperature by default; eligible samples up to 20 g can use a specified delivery temperature.
+Enable **Same element only** to limit delivery to empty or matching targets. Turn it off to drip liquid into air. Samples keep their original temperature by default; after Temperature Modulation research, eligible samples up to 20 g can use a specified delivery temperature.
 
 ## Verified in v0.15.0
 

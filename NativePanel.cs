@@ -137,10 +137,9 @@ namespace OniPrecision
         private bool Editable() => PrecisionMod.Ready && !invalidBuffer && !InFlight;
 
 
-        private static readonly bool TestUnlock = true;
-        private static bool Unlocked(string tech) => TestUnlock || Db.Get()?.Techs?.TryGet(tech)?.IsComplete() == true;
+        private static bool Unlocked(string tech) => Db.Get()?.Techs?.TryGet(tech)?.IsComplete() == true;
         private static string ToolTech(FluidPhase phase) => phase == FluidPhase.Gas ? "GasPiping" : "LiquidPiping";
-        private static string ToolLabel(FluidPhase phase) => phase == FluidPhase.Gas ? PipetteText.Get("Gas Pipette", "取气管") : PipetteText.Get("Liquid Pipette", "取液器");
+        private static string ToolLabel(FluidPhase phase) => phase == FluidPhase.Gas ? PipetteText.Get("Gas Pipette", "移气管") : PipetteText.Get("Liquid Pipette", "移液器");
         [KSerialization.Serialize] private bool sameOnly;
         private float ConfiguredKg
         {
