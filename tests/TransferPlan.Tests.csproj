@@ -7,5 +7,6 @@
   <ItemGroup>
     <Compile Include="../TransferPlan.cs" Link="TransferPlan.cs" />
     <Compile Include="TransferPlan.Tests.cs" />
+    <Compile Include="../PipeAccounting.cs" Link="PipeAccounting.cs" />
   </ItemGroup>
 </Project>

@@ -49,10 +49,6 @@ namespace OniPrecision
 
         public static bool CanFitPipe(float existingKg, float additionKg, FluidPhase phase)
         {
-            if (!Finite(existingKg) || existingKg < 0 ||
-                !Finite(additionKg) || additionKg <= 0)
-                return false;
-
             double capacity;
             switch (phase)
             {
@@ -61,6 +57,15 @@ namespace OniPrecision
                 default: return false;
             }
 
+            return CanFitPipe(existingKg, additionKg, capacity);
+        }
+
+        public static bool CanFitPipe(float existingKg, float additionKg, double capacity)
+        {
+            if (!Finite(existingKg) || existingKg < 0 || !Finite(capacity) ||
+                !Finite(additionKg) || additionKg <= 0)
+                return false;
+
             // Float addition could round over-capacity values down to the cap.
             // Subtract first to avoid losing tiny positive additions at the cap.
             return existingKg < capacity && additionKg <= capacity - existingKg;
@@ -68,7 +73,7 @@ namespace OniPrecision
 
         public static bool TryCreate(FluidSample source, FluidSample target,
             FluidPhase desiredPhase, double requestedKg, bool temperatureUnlocked,
-            double? targetCelsius, out TransferPlan plan, out TransferRejection rejection)
+            double? targetCelsius, out TransferPlan plan, out TransferRejection rejection, bool calibrated = false)
         {
             plan = default(TransferPlan);
             if (source.Cell < 0 || target.Cell < 0)
@@ -88,7 +93,7 @@ namespace OniPrecision
                 !ValidKelvin(source.TemperatureK) || (!empty && !ValidKelvin(target.TemperatureK)))
                 return Reject(TransferRejection.InvalidSample, out rejection);
 
-            double min = desiredPhase == FluidPhase.Gas ? MinGasKg : MinLiquidKg;
+            double min = calibrated ? 1e-9 : desiredPhase == FluidPhase.Gas ? MinGasKg : MinLiquidKg;
             double max = desiredPhase == FluidPhase.Gas ? MaxGasKg : MaxLiquidKg;
             if (!Finite(requestedKg) || requestedKg < min || requestedKg > max)
                 return Reject(TransferRejection.InvalidAmount, out rejection);

@@ -24,10 +24,14 @@ try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $mod
     }
     Copy-Item -LiteralPath (Join-Path $bin 'OniPrecision.dll') -Destination $mod
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.zh-CN.md') -Destination $stage
-    $archive = Join-Path $tmp 'OniPrecision-install.zip'
-    Compress-Archive -LiteralPath @($mod, (Join-Path $stage 'README.zh-CN.md')) -DestinationPath $archive
-    $result = Join-Path $out 'OniPrecision-install.zip'
+    $docs = @('LICENSE', 'README.zh-CN.md', 'README-Moono.zh-CN.md')
+    foreach ($name in $docs) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $stage
+    }
+    $archive = Join-Path $tmp 'YAPP-install.zip'
+    $packagePaths = @($mod) + @($docs | ForEach-Object { Join-Path $stage $_ })
+    Compress-Archive -LiteralPath $packagePaths -DestinationPath $archive
+    $result = Join-Path $out 'YAPP-install.zip'
     Copy-Item -LiteralPath $archive -Destination $result -Force
     Write-Output "Install archive: $result"
 } finally {

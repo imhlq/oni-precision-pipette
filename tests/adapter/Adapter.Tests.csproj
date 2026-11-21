@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="../../PrecisionMod.cs;../../ConduitTransfer.cs;../../TransferPlan.cs;../../PipeAccounting.cs;Stubs.cs;Tests.cs" /></ItemGroup></Project>
