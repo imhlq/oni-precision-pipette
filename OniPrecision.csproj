@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>OniPrecision</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="TransferPlan.cs;PrecisionMod.cs" />
+    <Reference Include="Assembly-CSharp;Assembly-CSharp-firstpass;0Harmony;UnityEngine.CoreModule;UnityEngine.IMGUIModule;UnityEngine.TextRenderingModule">
+      <HintPath>$(OniManagedDir)/%(Identity).dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="CheckGameReferences" BeforeTargets="ResolveReferences" Condition="!Exists('$(OniManagedDir)/Assembly-CSharp.dll')">
+    <Error Text="Set -p:OniManagedDir to the Oxygen Not Included Managed directory or an authorized reference assembly directory." />
+  </Target>
+</Project>
