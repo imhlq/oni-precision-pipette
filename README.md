@@ -1,38 +1,53 @@
 # Yet Another Precision Pipette (YAPP)
 
-**v0.14.2 · U60 763796 or newer · local build.** This branch was built against two U60 reference sets and checked against Moono v2026.11.20.04 source. On Moono with game build 764025, a copied colony loaded and the native oxygen tooltip displayed after 15 rounds of switching between the liquid and gas overlays. Paused transfers, map-to-pipe transfers in both directions, and reloading a held sample still need in-game verification.
+Move measured samples of liquid or gas in *Oxygen Not Included*. Pick up a sample from a cell or conduit, carry it in the pipette, and dispense it at another target. To make a drop of water fall, collect water, turn off the same-element restriction, then dispense into air above the landing spot.
 
-[中文安装与验收](README-Moono.zh-CN.md) · [optional read-only map probe](diagnostics/map-probe/README.md)
+**Version 0.14.2** targets U60, starting with game build 763796. [简体中文](README.zh-CN.md) · [Moono compatibility notes (中文)](README-Moono.zh-CN.md) · [MIT license](LICENSE)
 
-Select 取液管, then hold the left mouse button on a liquid tile for 0.65 s to collect the calibrated dose (Ctrl+wheel, Tab for conduits). The filled cursor indicates a held sample. Hold on a gas, vacuum or matching liquid tile to dispense. Hold left to collect, hold right to dispense; Esc exits the tool. Placement follows native liquid simulation.
+## Using the pipettes
 
-The shared gas/liquid panel retains **pipe-to-pipe** doses: gas 10 µg–1 kg, liquid 1 mg–10 kg, subject to representable float mass changes. Research-gated temperature adjustment remains limited to 20 g and same-phase temperatures. This does not modify food spoilage or maintain temperature. Pipe output is not a claim that vanilla vents deliver exact map doses.
+Open **Plumbing → 取液器** for liquids or **Ventilation → 取气管** for gases. The tools are unlocked in this test version. In the panel on the right, set the fill limit and choose µg, mg, g, or kg. Enter a value from 1 to 1000, or use the slider for 1, 5, 10, 15, and so on.
 
-## Safety behavior
+| Control | Action |
+| --- | --- |
+| Hold left mouse for 0.65 s | Collect from the highlighted cell. A partially filled pipette can collect more of the same element. |
+| Hold right mouse for 0.65 s | Dispense into a valid target. Release early to cancel. |
+| Ctrl + mouse wheel | Cycle through the 10 µg, 10 mg, 10 g, and 10 kg presets. |
+| Tab | Switch between the map and the matching conduit overlay. Use this between pickup and delivery to change the destination type. |
+| Backquote | Return to the map view. |
+| Esc | Leave the tool and keep the held sample. |
 
-- Resolve required declared SaveGame.OnPrefabInit / Game.CanSave hooks before patching. Missing hooks or failed installation disable transfers; no unconditional Harmony PatchAll attributes remain. If only the save guard is missing, the read-only component still attaches to retain old buffers. If the component-install hook itself is absent, buffer preservation cannot be assured: do not re-save that colony with this candidate.
-- Synchronous pipe receipts are checked against actual mass and germ deltas. Verified partial receipts keep exact residual mass and actual remaining germs; mixed germ species and count overflow refuse. A zero receipt with no mutation is retryable. No guessed proportional rounding of residual germs.
-- Unknown native results or exceptions quarantine the operation. No retry, refund, clearing or automatic unlock. Request context and quarantine state are serialized defensively. The displayed recovery is to leave without saving and reload a known pre-transfer backup, losing subsequent progress. A quarantined buffer is **not** a claim that all its displayed mass still exists exclusively in storage.
-- Normal transfers and verified held buffers do not block saves. Quarantine uses Game.CanSave and, where present, ClusterManager.AddSaveBlocker. The beta reference set lacks the latter API. **Autosave and save-and-quit coverage is unverified.** There is no throwing serializer patch and no claim that every save route is blocked. Keep a separate backup; do not save a quarantined session. If a save nevertheless captures quarantine, reload retains the lock rather than authorizing another credit.
-- v0.2 empty buffers normalize stale temperature/germ metadata. Nonempty legacy buffers keep their fields and can be explicitly delivered to a compatible pipe at original temperature; changed-temperature delivery still checks research. Legacy automatic return is disabled because origin-world identity was not saved. New buffers record and recheck origin-world identity before return. Map return is always refused. Invalid nonempty buffers are retained without enabling transfers.
-- A v0.2 operation whose callback was already lost cannot be reconstructed by this upgrade. Exit v0.2 normally with no transfer outstanding before switching; retain an earlier backup.
+The native hover card describes the **target**. The sample readout describes what the pipette **holds**. Enable **仅允许同类目标** to restrict delivery to empty or matching targets. Keep the original temperature or set a delivery temperature for an eligible dose of up to 20 g.
 
-## Clone and build
+## Build and install
 
-On the desktop with the game installed, use .NET SDK 8 or newer. In Steam, browse the game files and find the `OxygenNotIncluded_Data/Managed` folder containing `Assembly-CSharp.dll`. If you use Moono, use **the U60 game installation's Managed folder**, not the replacement player's folder. No game DLLs are bundled.
+Install .NET SDK 8 or newer and locate the game's `OxygenNotIncluded_Data/Managed` directory. Moono users should use the assemblies from the U60 game installation.
 
-PowerShell:
+```sh
+git clone https://github.com/imhlq/oni-yet-another-precision-pipette.git
+cd oni-yet-another-precision-pipette
+```
+
+On Windows, run the following in PowerShell, adjusting the Steam library path.
+
 ```powershell
- # From the local v0.14.2 source folder
-
 .\build.ps1 -ManagedDir 'D:\SteamLibrary\steamapps\common\OxygenNotIncluded\OxygenNotIncluded_Data\Managed'
 ```
 
-Linux/macOS: `bash build.sh /path/to/OxygenNotIncluded_Data/Managed`.
+On Linux or macOS, run `bash build.sh /path/to/OxygenNotIncluded_Data/Managed`.
 
-Unzip `dist/YAPP-install.zip`; put its `OniPrecision` folder in the existing `mods/Local` folder and restart. Use a copied test save and only one installation. See [Klei's log locations](https://support.klei.com/hc/en-us/articles/360052993772-Oxygen-Not-Included-DLCs-Logs-and-Useful-Information-for-Bug-Reports) if startup fails. The independent read-only diagnostic is optional and is **not** included in this install ZIP.
+1. Exit the game and extract `dist/YAPP-install.zip`.
+2. Copy the extracted `OniPrecision` folder into the game's user-data `mods/Local` directory. On Windows the usual destination is `Documents\Klei\OxygenNotIncluded\mods\Local\OniPrecision`. The DLL and both YAML files belong directly inside that folder.
+3. Enable **Yet Another Precision Pipette (YAPP)** in the Mods menu, restart when prompted, and load a copy of your colony for the first run.
 
-Offline checks:
+## Compatibility and saves
+
+On Moono with game build 764025, a copied colony loaded and the native oxygen tooltip showed the element, type, mass, and temperature after 15 rounds of switching between liquid and gas overlays. **Paused consecutive transfers, map-to-conduit transfers in both directions, and reloading a held sample still need in-game verification.**
+
+Pipe transfers check the mass and germ counts actually received. A confirmed partial delivery leaves the remainder in the pipette. If the game returns an uncertain result, YAPP locks further transfers. Exit without saving and reload a pre-transfer backup in that case. Autosave and save-and-quit coverage still need verification. When upgrading from v0.2, finish outstanding transfers and keep a separate backup.
+
+## Developer checks
+
 ```sh
 dotnet run --project tests/TransferPlan.Tests.csproj -c Release
 dotnet run --project tests/TransferPlan.Tests.csproj -c Release -- --stress
@@ -40,15 +55,10 @@ dotnet run --project tests/adapter/Adapter.Tests.csproj -c Release
 dotnet run --project tests/references/References.Tests.csproj -c Release -- /path/to/Assembly-CSharp.dll
 ```
 
-Adapter tests compile the actual PrecisionMod.cs against handwritten offline doubles. They exercise control flow and receipts, **not native game semantics, Harmony execution or KSerialization save migration**. Metadata checks and clean builds against both available U60 reference sets do not establish runtime compatibility. Reference provenance: Sgt-Imalas/Sgt_Imalas-Oni-Mods Lib snapshots d3cc380348397a553745b4bd6b1bb6c5e2ea98b4 (u60-beta) and dcc52615c856dd63c96ffdf320acb11fca795dcf (u60-post).
+The stress run exercises one million randomized planner inputs. Adapter tests exercise transfer control flow with simulated game interfaces. The reference check inspects the installed game's assembly metadata. For observations inside a running colony, see the [optional read-only map probe](diagnostics/map-probe/README.md).
 
-## Remaining U60 gameplay checks
+## Automated builds and releases
 
-1. Back up a disposable U60 save, install only this local mod, load/reload, check one shared panel and no Harmony/load errors. Verify normal manual save, autosave and save-and-quit.
-2. In isolated gas pipes, transfer 50 µg from a suitably light source into an empty pipe; check source delta, destination delta, temperature, and empty buffer. Repeat with a 30 g liquid dose and save/reload.
-3. Test pickup, invalid targets, right-click cancellation and dispensing on a copied save. Try foreign elements, full pipes, paused sim, dismantled targets and identical endpoints.
-4. Before research, reject changed temperature. After research, test a small compatible dose; reject >20 g and phase-changing temperatures. This candidate does not deliver to a food cell.
-5. Recover a genuine v0.2 empty buffer with stale metadata and a nonempty map-origin buffer; explicitly deliver the latter to a compatible pipe at original temperature. Confirm legacy auto-return refuses. New pipe buffers should save/reload and return only to the original world/pipe.
-6. With a controlled test harness, test refusal, partial acceptance with germs, and native exceptions/invalid receipts. Confirm known remainders persist and unknowns cannot retry. Inspect the save blocker, autosave and save-and-quit without overwriting the backup; recover unknowns by reloading that backup. Repeat on the same U60 game build under both the stock and Moono players before considering release.
+Pull requests and pushes to `main` run the tests and build the install ZIP. Download the `yapp-install` artifact from a successful run on the [Actions page](https://github.com/imhlq/oni-yet-another-precision-pipette/actions/workflows/release.yml) and extract the inner `YAPP-install.zip`.
 
-[中文说明](README.zh-CN.md) · [MIT License](LICENSE)
+To publish a version, commit its version number in `mod_info.yaml` and push the matching `vX.Y.Z` tag. After the tagged build passes, the workflow publishes `YAPP-install.zip` on the [Releases page](https://github.com/imhlq/oni-yet-another-precision-pipette/releases).

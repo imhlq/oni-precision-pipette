@@ -1,0 +1,72 @@
+name: Build and release YAPP
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Check release tag against mod version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(sed -nE 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' mod_info.yaml)
+          [[ -n "$version" && "$GITHUB_REF_NAME" == "v$version" ]] || {
+            echo "::error::Tag must match the version in mod_info.yaml (expected v$version)"
+            exit 1
+          }
+
+      - name: Fetch U60 build references
+        env:
+          REVISION: dcc52615c856dd63c96ffdf320acb11fca795dcf
+        run: |
+          mkdir -p "$RUNNER_TEMP/managed"
+          for lib in Assembly-CSharp Assembly-CSharp-firstpass 0Harmony UnityEngine.CoreModule UnityEngine.UI UnityEngine.UIModule UnityEngine.InputLegacyModule Unity.TextMeshPro UnityEngine.TextRenderingModule; do
+            curl --fail --silent --show-error --location --retry 3 \
+              "https://raw.githubusercontent.com/Sgt-Imalas/Sgt_Imalas-Oni-Mods/$REVISION/Lib/$lib.dll" \
+              -o "$RUNNER_TEMP/managed/$lib.dll"
+          done
+
+      - name: Test and package
+        run: |
+          dotnet run --project tests/TransferPlan.Tests.csproj -c Release -- --stress
+          dotnet run --project tests/adapter/Adapter.Tests.csproj -c Release
+          dotnet run --project tests/references/References.Tests.csproj -c Release -- "$RUNNER_TEMP/managed/Assembly-CSharp.dll"
+          bash build.sh "$RUNNER_TEMP/managed"
+          unzip -t dist/YAPP-install.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yapp-install
+          path: dist/YAPP-install.zip
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: yapp-install
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" YAPP-install.zip --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "YAPP $GITHUB_REF_NAME" --generate-notes
