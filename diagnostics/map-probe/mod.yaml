@@ -1,0 +1,3 @@
+title: U60 Map Probe (Read Only)
+description: Opt-in read-only map sampling to Player.log. Does not transfer material.
+staticID: Private.OniU60MapProbe

@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="TransferPlan.cs;PrecisionMod.cs" />
+    <Compile Include="TransferPlan.cs;PrecisionMod.cs;PipeAccounting.cs" />
     <Reference Include="Assembly-CSharp;Assembly-CSharp-firstpass;0Harmony;UnityEngine.CoreModule;UnityEngine.IMGUIModule;UnityEngine.TextRenderingModule">
       <HintPath>$(OniManagedDir)/%(Identity).dll</HintPath>
       <Private>false</Private>

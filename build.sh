@@ -22,10 +22,10 @@ for name in mod.yaml mod_info.yaml; do
     cp -- "$root/$name" "$tmp/package/OniPrecision/$name"
 done
 cp -- "$tmp/build/OniPrecision.dll" "$tmp/package/OniPrecision/OniPrecision.dll"
-cp -- "$root/README.zh-CN.md" "$tmp/package/README.zh-CN.md"
+cp -- "$root/README.zh-CN.md" "$root/README-Moono.zh-CN.md" "$tmp/package/"
 (
     cd -- "$tmp/package"
-    zip -q "$tmp/OniPrecision-install.zip" README.zh-CN.md \
+    zip -q "$tmp/OniPrecision-install.zip" README.zh-CN.md README-Moono.zh-CN.md \
         OniPrecision/mod.yaml OniPrecision/mod_info.yaml OniPrecision/OniPrecision.dll
 )
 mv -f -- "$tmp/OniPrecision-install.zip" "$out/OniPrecision-install.zip"

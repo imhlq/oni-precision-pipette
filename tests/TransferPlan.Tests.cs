@@ -14,6 +14,7 @@ static class TransferPlanTests
 
     static void Main()
     {
+        AccountingTests();
         var micro = Accept(H, Vacuum, FluidPhase.Gas, 50e-9, true, -25);
         Assert(Math.Abs(micro.AmountKg - 50e-9) <= 50e-9 * .05, "50 µg tolerance");
         Assert(Math.Abs(micro.TransferTemperatureK - 248.15) < .001, "°C to K");
@@ -89,6 +90,47 @@ static class TransferPlanTests
         Assert(success > 500, "ordinary same-element cases should commonly succeed");
         Console.WriteLine("{0} explicit planner cases plus 2000 randomized cases passed ({1} accepted)",
             cases, success);
+    }
+
+    static void AccountingTests()
+    {
+        Assert(PipeAccounting.ValidDebit(1f, .75f, .25f, 11, 8, 3), "verified debit");
+        Assert(PipeAccounting.ValidDebit(1f, 1f, 0, 11, 11, 0), "refused debit");
+        Assert(!PipeAccounting.ValidDebit(1f, .5f, .25f, 11, 8, 3), "debit mass mismatch");
+        Assert(!PipeAccounting.ValidDebit(1f, .75f, .25f, 11, 7, 3), "debit germ mismatch");
+        Assert(!PipeAccounting.ValidDebit(1f, 1f, 0, 11, 10, 1), "zero mass with germs");
+        Assert(!PipeAccounting.ValidDebit(1f, float.NaN, .25f, 11, 8, 3), "NaN debit");
+        Assert(PipeAccounting.TryCredit(1, 11, 0, .25f, 0, 2, .25f, out var rest, out var germs)
+            && rest == .75f && germs == 9, "partial uses actual germs, not rounding");
+        Assert(PipeAccounting.TryCredit(rest, germs, .25f, 1, 2, 11, .75f, out rest, out germs)
+            && rest == 0 && germs == 0, "complete remainder");
+        Assert(PipeAccounting.TryCredit(1, 11, .5f, .5f, 4, 4, 0, out rest, out germs)
+            && rest == 1 && germs == 11, "zero refusal keeps buffer");
+        Assert(!PipeAccounting.TryCredit(1, 11, 0, 1, 0, 10, 1, out rest, out germs)
+            && rest == 1 && germs == 11, "full receipt cannot erase leftover germs");
+        foreach (float bad in new[] { float.NaN, float.PositiveInfinity, -.1f, 2f })
+            Assert(!PipeAccounting.TryCredit(1, 11, 0, 1, 0, 11, bad, out rest, out germs), "invalid receipt");
+        Assert(!PipeAccounting.TryCredit(1, 11, 0, .5f, 0, 5, .25f, out rest, out germs), "wrong target delta");
+        Assert(!PipeAccounting.TryCredit(1, 11, 1, 1, 0, 0, 1e-8f, out rest, out germs), "rounded-away acceptance");
+        Assert(!PipeAccounting.TryCredit(1, 11, 0, 1e-8f, 0, 0, 1e-8f, out rest, out germs), "rounded-away remainder");
+        Assert(!PipeAccounting.TryCredit(1, 11, 0, .25f, 0, 12, .25f, out rest, out germs), "extra germs");
+        Assert(!PipeAccounting.TryCredit(1, 11, 0, 0, 0, 1, 0, out rest, out germs), "germs on zero receipt");
+        Assert(PipeAccounting.ValidBuffer(0, 0, 0, 0), "new save empty buffer");
+        Assert(PipeAccounting.ValidBuffer(.01f, 300, 248.15f, 3), "legacy pending tempered sample");
+        foreach (float bad in new[] { float.NaN, float.PositiveInfinity, -1f })
+            Assert(!PipeAccounting.ValidBuffer(bad, 300, 300, 0), "bad legacy mass");
+        Assert(!PipeAccounting.ValidBuffer(1, 0, 300, 0), "bad legacy temperature");
+        Assert(PipeAccounting.ValidBuffer(0, float.NaN, 0, 3), "old empty buffer metadata is stale, not held matter");
+        for (int mass = 1; mass <= 64; mass++)
+            for (int accepted = 0; accepted <= mass; accepted++)
+            {
+                int delivered = accepted * 3 / mass;
+                Assert(PipeAccounting.TryCredit(mass / 64f, 3, 0, accepted / 64f,
+                    0, delivered, accepted / 64f, out rest, out germs), "fractional receipts");
+                Assert((double)rest + accepted / 64f == mass / 64f && germs + delivered == 3,
+                    "partial mass and germ conservation");
+            }
+        Console.WriteLine("Pipe accounting: malformed receipts, legacy buffers, and 2144 partial receipts passed.");
     }
 
     static TransferPlan Accept(FluidSample a, FluidSample b, FluidPhase phase, double kg,
