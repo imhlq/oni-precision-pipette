@@ -22,6 +22,18 @@ class Tests {
   Check(!CanPick(1,FluidPhase.Gas),"full reservoir blocks pickup before hold");
   Check(p.DropRefusal(2,true,FluidPhase.Gas,out _)==null,"empty compatible pipe permits placement");
   Check(p.DropRefusal(-1,false,FluidPhase.Gas,out _)!=null,"invalid map target refuses placement");
+  Grid.Element[2] = ElementLoader.FindElementByHash(SimHashes.Oxygen);
+  Grid.Mass[2] = 1f;
+  Check(p.DropRefusal(2,false,FluidPhase.Gas,out _) != null &&
+      Get<float>(p,"heldKg") == .25f, "different gas refuses without consuming the sample");
+  Grid.Element[2] = ElementLoader.FindElementByHash(SimHashes.Hydrogen);
+  Set(p,"heldKg",1e-9f);
+  Check(p.DropRefusal(2,false,FluidPhase.Gas,out _) != null &&
+      Get<float>(p,"heldKg") == 1e-9f, "sub-resolution map dose is retained");
+  Set(p,"heldKg",.25f);
+  Check(p.DropRefusal(2,false,FluidPhase.Gas,out _) == null, "same gas accepts a representable dose");
+  Grid.Element[2] = ElementLoader.FindElementByHash(SimHashes.Vacuum);
+  Grid.Mass[2] = 0f;
   Game.Instance.gasConduitFlow.MaxMass=.1f;
   Check(p.DropRefusal(2,true,FluidPhase.Gas,out _)!=null && Get<float>(p,"heldKg")==.25f,"capacity preview rejects without mutating buffer");
   p=New(); Game.Instance.gasConduitFlow.MaxMass=.1f; Call(p,"StartTransfer"); Check(Game.Instance.gasConduitFlow.Cells[1].mass==.5f && Get<float>(p,"heldKg")==0,"runtime pipe capacity checked before debit");

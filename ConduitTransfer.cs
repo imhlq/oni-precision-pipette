@@ -92,20 +92,20 @@ namespace OniPrecision
             plan = default;
             src = default;
             if (!sourcePipe || !targetPipe)
-            return "拒绝：地图转移已禁用；尚未取样。请选择管道。";
+            return PipetteText.Get("Choose a conduit to transfer from this panel.", "拒绝：地图转移已禁用；尚未取样。请选择管道。");
             if (!ReadEndpoint(source, sourcePipe, mode, out src) || !ReadEndpoint(target, targetPipe, mode, out var dst))
-            return "拒绝：起点或目标无效。";
+            return PipetteText.Get("Invalid source or target.", "拒绝：起点或目标无效。");
             if (!TryNumber(massText, out var dose))
-            return "拒绝：剂量不是有效数值。";
+            return PipetteText.Get("Invalid dose.", "拒绝：剂量不是有效数值。");
             if ((uint)unitIndex >= (uint)KgPerUnit.Length)
-            return "拒绝：请明确选择剂量单位。";
+            return PipetteText.Get("Select a dose unit.", "拒绝：请明确选择剂量单位。");
             dose *= KgPerUnit[unitIndex];
             double? setC = null;
             bool unlock = ResearchDone();
             if (tempered)
             {
                 if (!unlock || !TryNumber(temperatureText, out var temp) || dose > ThermalMaxKg)
-                return "拒绝：变温未解锁、温度无效，或剂量超过 20 g。";
+                return PipetteText.Get("Temperature locked, invalid or dose exceeds 20 g.", "拒绝：变温未解锁、温度无效，或剂量超过 20 g。");
                 setC = temp;
             }
 
@@ -113,12 +113,12 @@ namespace OniPrecision
             return RejectLabel(reason);
 
             if (!TransferPlan.CanFitPipe(dst.MassKg, plan.AmountKg, PipeCapacity(mode)))
-            return "拒绝：目标管道没有足够空间。未取样。";
+            return PipetteText.Get("Insufficient conduit capacity. No sample taken.", "拒绝：目标管道没有足够空间。未取样。");
 
             var element = ElementLoader.FindElementByHash((SimHashes)src.Element);
-            if (element == null) return "拒绝：无法识别源元素。";
+            if (element == null) return PipetteText.Get("Unknown source element.", "拒绝：无法识别源元素。");
             if (setC.HasValue && !WithinPhase(element, plan.TransferTemperatureK))
-            return "拒绝：设定温度会使该元素发生相变。";
+            return PipetteText.Get("Requested temperature would change the phase.", "拒绝：设定温度会使该元素发生相变。");
             return null;
         }
 
@@ -141,7 +141,7 @@ namespace OniPrecision
             if (before.mass != src.MassKg || (int)before.element != src.Element ||
                 before.temperature != src.TemperatureK || before.diseaseCount < 0 ||
                 (before.diseaseCount > 0 && before.diseaseIdx == byte.MaxValue))
-            { status = "拒绝：源管道状态或病菌数据变化。未取样。"; return false; }
+            { status = PipetteText.Get("Source contents changed. No sample taken.", "拒绝：源管道状态或病菌数据变化。未取样。"); return false; }
             uncertainContext = "debit cell=" + srcCell + " world=" + Grid.WorldIdx[srcCell] +
                 " element=" + src.Element + " kg=" + plan.AmountKg.ToString("R", Invariant);
             inFlight = true;
@@ -156,9 +156,9 @@ namespace OniPrecision
                      (removed.diseaseCount > 0 && removed.diseaseIdx != before.diseaseIdx))) ||
                     (after.mass > 0 && (after.element != before.element ||
                      (after.diseaseCount > 0 && after.diseaseIdx != before.diseaseIdx))))
-                { Quarantine("管道取样账目无法确认"); return false; }
+                { Quarantine(PipetteText.Get("Unconfirmed conduit debit", "管道取样账目无法确认")); return false; }
                 if (removed.mass == 0)
-                { inFlight = false; uncertainContext = null; status = "管道未取出样本。"; return false; }
+                { inFlight = false; uncertainContext = null; status = PipetteText.Get("No sample removed from the conduit.", "管道未取出样本。"); return false; }
                 float priorMass = heldKg;
                 Buffer(removed.mass, removed.temperature,
                     plan.TransferTemperatureK,
@@ -166,9 +166,9 @@ namespace OniPrecision
                 inFlight = false;
                 uncertainContext = null;
                 if (heldHash != src.Element || heldKg - priorMass != plan.AmountKg)
-                { status = "实际取样与计划不同；样本保留，可退回。"; return false; }
+                { status = PipetteText.Get("Actual pickup differs from plan. Sample retained for return.", "实际取样与计划不同；样本保留，可退回。"); return false; }
             }
-            catch (Exception error) { Quarantine("管道取样异常", error); return false; }
+            catch (Exception error) { Quarantine(PipetteText.Get("Conduit pickup error", "管道取样异常"), error); return false; }
             return true;
         }
 
@@ -207,39 +207,39 @@ namespace OniPrecision
             out Element element, out float temperature, out FluidSample dst, out int beforeGerms, out byte beforeDisease)
         {
             element = null; temperature = 0; dst = default; beforeGerms = 0; beforeDisease = byte.MaxValue;
-            if (!PrecisionMod.Ready || InFlight || invalidBuffer || !(heldKg > 0f)) return "当前无可投放的样本。";
+            if (!PrecisionMod.Ready || InFlight || invalidBuffer || !(heldKg > 0f)) return PipetteText.Get("No sample to dispense.", "当前无可投放的样本。");
             if (returnToSource && (originVersion != 1 || !Grid.IsValidCell(originalCell) ||
                 Grid.WorldIdx[originalCell] != originalWorld))
-            return "拒绝：旧缓冲或原世界无法确认。请选择兼容管道按原温投放。";
+            return PipetteText.Get("Unknown origin. Choose a compatible conduit and use the original temperature.", "拒绝：旧缓冲或原世界无法确认。请选择兼容管道按原温投放。");
             if (!dstPipe)
-            return "拒绝：地图投放和原格退回已禁用。缓冲保留；可投放至兼容管道。";
+            return PipetteText.Get("Choose a compatible conduit. Sample retained.", "拒绝：地图投放和原格退回已禁用。缓冲保留；可投放至兼容管道。");
             if (!returnToSource && !originalTemperature && outputK != originalK && (!ResearchDone() || heldKg > ThermalMaxKg))
-            return "拒绝：变温需研究解锁且最多 20 g。可按原温退回管道。";
+            return PipetteText.Get("Changing temperature requires research and at most 20 g. Return at the original temperature.", "拒绝：变温需研究解锁且最多 20 g。可按原温退回管道。");
             element = ElementLoader.FindElementByHash((SimHashes)heldHash);
             temperature = returnToSource || originalTemperature ? originalK : outputK;
             if (germCount < 0 || (germCount > 0 && germIndex == byte.MaxValue) ||
                 element == null || (!element.IsGas && !element.IsLiquid) ||
                 !(temperature > 0) || !WithinPhase(element, temperature))
-            return "拒绝：样本状态或温度无效。";
+            return PipetteText.Get("Invalid sample state or temperature.", "拒绝：样本状态或温度无效。");
             FluidPhase phase = element.IsGas ? FluidPhase.Gas : FluidPhase.Liquid;
             if (!ReadEndpoint(dstCell, dstPipe, phase, out dst) ||
                 (!returnToSource && dstCell == originalCell && dstPipe == originalPipe) ||
                 (dst.Phase != FluidPhase.Vacuum && (dst.Element != heldHash || dst.Phase != phase)))
-            return "拒绝：目标须为空或同元素。样本保留，未改投附近。";
+            return PipetteText.Get("Target must be empty or contain the same element. Sample retained.", "拒绝：目标须为空或同元素。样本保留，未改投附近。");
             if ((double)(float)((double)dst.MassKg + heldKg) - dst.MassKg != heldKg)
-            return "拒绝：目标质量太大，无法准确接收该剂量。样本保留。";
+            return PipetteText.Get("Target mass too large for an accurate transfer. Sample retained.", "拒绝：目标质量太大，无法准确接收该剂量。样本保留。");
 
             if (!TransferPlan.CanFitPipe(dst.MassKg, heldKg, PipeCapacity(phase)))
-            return "拒绝：目标管道没有足够空间。样本保留。";
+            return PipetteText.Get("Insufficient conduit capacity. Sample retained.", "拒绝：目标管道没有足够空间。样本保留。");
             var flow = PipeFlow(phase);
             var before = flow.GetContents(dstCell);
             if (before.mass != dst.MassKg || (before.mass > 0 && (int)before.element != heldHash))
-            return "拒绝：目标管道状态变化。缓冲保留。";
+            return PipetteText.Get("Conduit contents changed. Sample retained.", "拒绝：目标管道状态变化。缓冲保留。");
             if (before.diseaseCount < 0 || (before.diseaseCount > 0 && before.diseaseIdx == byte.MaxValue) ||
                 (before.diseaseCount > 0 && germCount > 0 && before.diseaseIdx != germIndex))
-            return "拒绝：病菌种类不同，无法核对病菌账目。样本保留。";
+            return PipetteText.Get("Different germ types. Sample retained.", "拒绝：病菌种类不同，无法核对病菌账目。样本保留。");
             if ((long)before.diseaseCount + germCount > int.MaxValue)
-            return "拒绝：病菌计数将溢出。缓冲保留。";
+            return PipetteText.Get("Germ count would overflow. Sample retained.", "拒绝：病菌计数将溢出。缓冲保留。");
             beforeGerms = before.diseaseCount;
             beforeDisease = before.diseaseIdx;
             return null;
@@ -250,12 +250,14 @@ namespace OniPrecision
             target = default;
             var held = ElementLoader.FindElementByHash((SimHashes)heldHash);
             if (!PrecisionMod.Ready || InFlight || invalidBuffer || heldKg <= 0 || held == null ||
-                (phase == FluidPhase.Gas ? !held.IsGas : !held.IsLiquid)) return "样本不可用";
+                (phase == FluidPhase.Gas ? !held.IsGas : !held.IsLiquid)) return PipetteText.Get("Sample unavailable", "样本不可用");
             if (pipe) return CheckEmission(cell, true, originalPipe && cell == originalCell, true,
                 out _, out _, out target, out _, out _);
-            if (!ReadEndpoint(cell, false, phase, out target)) return "目标格不可用";
-            if (target.Phase != FluidPhase.Gas && target.Phase != FluidPhase.Vacuum && target.Element != heldHash)
-                return "目标格已有其他物质";
+            if (!ReadEndpoint(cell, false, phase, out target)) return PipetteText.Get("Target cell unavailable", "目标格不可用");
+            if (target.Phase != FluidPhase.Vacuum && target.Element != heldHash && !(held.IsLiquid && target.Phase == FluidPhase.Gas))
+                return PipetteText.Get("Target contains another element", "目标格已有其他物质");
+            if (target.Element == heldHash && target.MassKg + heldKg == target.MassKg)
+                return PipetteText.Get("Dose is too small to increase the target mass.", "该剂量太小，无法增加目标格质量。");
             return null;
         }
 
@@ -285,21 +287,21 @@ namespace OniPrecision
                     (after.mass > 0 && after.element != element.id) ||
                     (after.diseaseCount > 0 && after.diseaseIdx !=
                         (beforeGerms > 0 ? beforeDisease : germIndex)))
-                { Quarantine("管道投放账目无法确认"); return; }
+                { Quarantine(PipetteText.Get("Unconfirmed conduit delivery", "管道投放账目无法确认")); return; }
                 inFlight = false;
                 uncertainContext = null;
                 if (remaining == 0) { FinishEmit(returnToSource, temperature); return; }
                 heldKg = remaining;
                 germCount = germsRemaining;
-                status = accepted == 0 ? "管道拒绝投放。样本保留。" :
-                    "管道只接收了 " + DescribeDose(accepted) + "；已核对余量与病菌，缓冲保留。";
+                status = accepted == 0 ? PipetteText.Get("Conduit refused delivery. Sample retained.", "管道拒绝投放。样本保留。") :
+                    PipetteText.Get("Conduit accepted only ", "管道只接收了 ") + DescribeDose(accepted) + PipetteText.Get(". Remaining mass and germs retained.", "；已核对余量与病菌，缓冲保留。");
             }
-            catch (Exception error) { Quarantine("管道投放异常", error); }
+            catch (Exception error) { Quarantine(PipetteText.Get("Conduit delivery error", "管道投放异常"), error); }
         }
 
         private void FinishEmit(bool returning, float temperature)
         {
-            status = (returning ? "已退回：" : "已投放：") +
+            status = (returning ? PipetteText.Get("Returned: ", "已退回：") : PipetteText.Get("Delivered: ", "已投放：")) +
                 DescribeDose(heldKg) + " · " + (temperature - 273.15).ToString("0.##", Invariant) + " °C";
             heldKg = 0;
             germCount = 0;

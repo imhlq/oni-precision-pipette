@@ -140,7 +140,7 @@ namespace OniPrecision
         private static readonly bool TestUnlock = true;
         private static bool Unlocked(string tech) => TestUnlock || Db.Get()?.Techs?.TryGet(tech)?.IsComplete() == true;
         private static string ToolTech(FluidPhase phase) => phase == FluidPhase.Gas ? "GasPiping" : "LiquidPiping";
-        private static string ToolLabel(FluidPhase phase) => phase == FluidPhase.Gas ? "取气管" : "取液器";
+        private static string ToolLabel(FluidPhase phase) => phase == FluidPhase.Gas ? PipetteText.Get("Gas Pipette", "取气管") : PipetteText.Get("Liquid Pipette", "取液器");
         [KSerialization.Serialize] private bool sameOnly;
         private float ConfiguredKg
         {
@@ -157,18 +157,52 @@ namespace OniPrecision
             mapTool?.InvalidatePreview();
         }
 
-        private void ApplyPreset()
+        [KSerialization.Serialize] private double liquidAmount = 10, gasAmount = 10;
+        [KSerialization.Serialize] private int liquidUnit = 2, gasUnit = 2;
+
+        private void RememberDose()
         {
-            unitIndex = calibration;
-            massText = "10";
-            if (amount != null) amount.text = massText;
+            if (!TryNumber(massText, out double value) || value < 1 || value > 1000) return;
+            if (cursorPhase == FluidPhase.Gas) { gasAmount = value; gasUnit = unitIndex; }
+            else { liquidAmount = value; liquidUnit = unitIndex; }
+        }
+
+        private void RestoreDose(FluidPhase phase)
+        {
+            cursorPhase = phase;
+            bool gas = phase == FluidPhase.Gas;
+            unitIndex = gas ? gasUnit : liquidUnit;
+            double value = gas ? gasAmount : liquidAmount;
+            if (unitIndex < 0 || unitIndex >= Units.Length || !(value >= 1 && value <= 1000))
+            {
+                value = 10;
+                unitIndex = 2;
+            }
+            massText = value.ToString(Invariant);
+            SyncDoseControls();
+        }
+
+        private void SyncDoseControls()
+        {
+            if (amount != null) amount.SetTextWithoutNotify(massText);
+            if (doseSlider != null && TryNumber(massText, out double value))
+                doseSlider.SetValueWithoutNotify((float)Math.Round(value / 5));
             Changed();
+        }
+
+        private void ApplyPreset(int index)
+        {
+            unitIndex = index;
+            massText = "10";
+            RememberDose();
+            SyncDoseControls();
         }
 
         private void BuildDoseControl()
         {
             amount = Number(112,34,massText,value => {
                 massText = value;
+                RememberDose();
                 if (TryNumber(value,out double n))
                     doseSlider.SetValueWithoutNotify((float)Math.Round(Math.Max(0, Math.Min(200, n/5))));
                 Changed();
@@ -188,7 +222,7 @@ namespace OniPrecision
             handle.anchoredPosition = Vector2.zero;
             doseSlider.targetGraphic = handle.gameObject.AddComponent<Image>();
             doseSlider.handleRect = handle;
-            doseSlider.SetValueWithoutNotify(2);
+            doseSlider.SetValueWithoutNotify(TryNumber(massText, out double initial) ? (float)Math.Round(initial / 5) : 2);
             doseSlider.onValueChanged.AddListener(index => amount.text = Math.Max(1,(int)index * 5).ToString(Invariant));
         }
 
@@ -213,27 +247,31 @@ namespace OniPrecision
         private void BuildParameters()
         {
             parameterMenu = ToolMenu.Instance.toolParameterMenu;
-            sheet = Box("YAPP configuration", parameterMenu.widgetContainer.transform.parent, 0, 0, 285, 270);
+            sheet = Box("YAPP configuration", parameterMenu.widgetContainer.transform.parent, 0, 0, 285, 306);
             var layout = sheet.gameObject.AddComponent<LayoutElement>();
             layout.minWidth = layout.preferredWidth = 285;
-            layout.minHeight = layout.preferredHeight = 270;
+            layout.minHeight = layout.preferredHeight = 306;
             sheet.gameObject.AddComponent<Image>().color = new Color(.16f,.15f,.2f,.98f);
             var title = Caption(Box("Title",sheet,4,0,277,32),"");
-            refresh.Add(()=>title.text = ToolLabel(cursorPhase) + "设置");
-            Caption(Box("Dose",sheet,4,34,100,30),"装填上限");
+            refresh.Add(()=>title.text = ToolLabel(cursorPhase) + PipetteText.Get(" Settings", "设置"));
+            Caption(Box("Dose",sheet,4,34,100,30),PipetteText.Get("Fill limit", "装填上限"));
             BuildDoseControl();
             for (int i=0;i<Units.Length;i++)
             {
                 int n=i;
                 ButtonAt(sheet,5+i*69,102,65,()=>unitIndex==n?"["+Units[n]+"]":Units[n],
-                    ()=>{unitIndex=n; Changed();},()=>!InFlight);
+                    ()=>{unitIndex=n; RememberDose(); Changed();},()=>!InFlight);
+                ButtonAt(sheet,5+i*69,138,65,()=> {
+                    string label = "10 " + Units[n];
+                    return unitIndex == n && TryNumber(massText, out double v) && v == 10 ? "[" + label + "]" : label;
+                },()=>ApplyPreset(n),()=>!InFlight);
             }
-            ButtonAt(sheet,5,138,275,()=>sameOnly?"仅允许同类目标  [开启]":"仅允许同类目标  [关闭]",
+            ButtonAt(sheet,5,174,275,()=>sameOnly?PipetteText.Get("Same element only [On]", "仅允许同类目标  [开启]"):PipetteText.Get("Same element only [Off]", "仅允许同类目标  [关闭]"),
                 ()=>{sameOnly=!sameOnly; Changed();},()=>!InFlight);
-            ButtonAt(sheet,5,174,165,()=>!Unlocked(TechId)?"变温未解锁":tempered?"指定温度 °C":"保持原温",
+            ButtonAt(sheet,5,210,165,()=>!Unlocked(TechId)?PipetteText.Get("Temperature locked", "变温未解锁"):tempered?PipetteText.Get("Set temp. °C", "指定温度 °C"):PipetteText.Get("Keep temperature", "保持原温"),
                 ()=>{tempered=!tempered; Changed();},()=>!InFlight && Unlocked(TechId));
-            degrees=Number(176,174,temperatureText,v=>{temperatureText=v; Changed();});
-            feedback=Caption(Box("Status",sheet,5,206,275,60),"");
+            degrees=Number(176,210,temperatureText,v=>{temperatureText=v; Changed();});
+            feedback=Caption(Box("Status",sheet,5,242,275,60),"");
             sheet.gameObject.SetActive(false);
         }
 
@@ -293,8 +331,8 @@ namespace OniPrecision
             amount.interactable=doseSlider.interactable=!InFlight;
             degrees.gameObject.SetActive(tempered && Unlocked(TechId));
             degrees.interactable=!InFlight;
-            feedback.text=ConfiguredKg<=0 ? "请输入 1 至 1000 之间的数值。" :
-                "上限 " + DescribeDose(ConfiguredKg) + " · " + (cursorPipe?"管道":"地图") + "\n" + status;
+            feedback.text=ConfiguredKg<=0 ? PipetteText.Get("Enter a value from 1 to 1000.", "请输入 1 至 1000 之间的数值。") :
+                PipetteText.Get("Limit: ", "上限 ") + DescribeDose(ConfiguredKg) + " · " + (cursorPipe?PipetteText.Get("Conduit", "管道"):PipetteText.Get("Map", "地图")) + "\n" + status;
         }
     }
 }

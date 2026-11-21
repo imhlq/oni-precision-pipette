@@ -1,64 +1,34 @@
 # Yet Another Precision Pipette (YAPP)
 
-Move measured samples of liquid or gas in *Oxygen Not Included*. Pick up a sample from a cell or conduit, carry it in the pipette, and dispense it at another target. To make a drop of water fall, collect water, turn off the same-element restriction, then dispense into air above the landing spot.
+Move a measured sample of liquid or gas between a map cell and a conduit in *Oxygen Not Included*. Draw water from a pipe, switch to the map, and dispense it above a liquid lock. The pipette uses the cell you select and keeps the sample if the target is invalid.
 
-**Version 0.14.2** targets U60, starting with game build 763796. [简体中文](README.zh-CN.md) · [Moono compatibility notes (中文)](README-Moono.zh-CN.md) · [MIT license](LICENSE)
+[Download v0.15.0](https://github.com/imhlq/oni-yet-another-precision-pipette/releases/download/v0.15.0/YAPP-install.zip) · [简体中文](README.zh-CN.md) · [MIT license](LICENSE)
 
-## Using the pipettes
+## Install
 
-Open **Plumbing → 取液器** for liquids or **Ventilation → 取气管** for gases. The tools are unlocked in this test version. In the panel on the right, set the fill limit and choose µg, mg, g, or kg. Enter a value from 1 to 1000, or use the slider for 1, 5, 10, 15, and so on.
+For U60, game build **763796** or later. Exit the game, extract `YAPP-install.zip`, and copy the **OniPrecision** folder into `mods/Local` in your ONI user-data directory. On Windows this is usually `Documents\Klei\OxygenNotIncluded\mods\Local`. Enable **Yet Another Precision Pipette** in the Mods menu and restart when prompted.
+
+## Take a sample
+
+Choose **Plumbing → Liquid Pipette** or **Ventilation → Gas Pipette**. Both tools are available immediately in this version. The native hover card shows what is in the target cell; the separate sample readout shows the element, mass, and temperature in the pipette.
 
 | Control | Action |
 | --- | --- |
-| Hold left mouse for 0.65 s | Collect from the highlighted cell. A partially filled pipette can collect more of the same element. |
-| Hold right mouse for 0.65 s | Dispense into a valid target. Release early to cancel. |
-| Ctrl + mouse wheel | Cycle through the 10 µg, 10 mg, 10 g, and 10 kg presets. |
-| Tab | Switch between the map and the matching conduit overlay. Use this between pickup and delivery to change the destination type. |
-| Backquote | Return to the map view. |
-| Esc | Leave the tool and keep the held sample. |
+| Hold left / right for 0.65 s | Collect / dispense. Release early to cancel. Top up a partial sample with the same element. |
+| Preset button or Ctrl + wheel | Select **10 µg**, **10 mg**, **10 g**, or **10 kg**. For a custom limit, enter 1–1000 and choose a unit. Each tool saves its own amount and unit with the colony. |
+| Tab / backquote | Toggle the matching conduit overlay / return to the map. You can switch between pickup and delivery. |
+| Esc | Leave the tool and keep the sample. |
 
-The native hover card describes the **target**. The sample readout describes what the pipette **holds**. Enable **仅允许同类目标** to restrict delivery to empty or matching targets. Keep the original temperature or set a delivery temperature for an eligible dose of up to 20 g.
+Enable **Same element only** to limit delivery to empty or matching targets. Turn it off to drip liquid into air. Samples keep their original temperature by default; eligible samples up to 20 g can use a specified delivery temperature.
 
-## Build and install
+## Verified in v0.15.0
 
-Install .NET SDK 8 or newer and locate the game's `OxygenNotIncluded_Data/Managed` directory. Moono users should use the assemblies from the U60 game installation.
+On Moono, U60 build **764025**, oxygen, water, and Visco-Gel each received **64 × 15.625 g** in one sealed cell. Each started at **1 kg** and finished at **2 kg**. All 192 deliveries matched the expected cell mass and emptied the pipette. After a full game restart, the gas and liquid settings restored independently at **35 mg** and **15 kg**.
 
-```sh
-git clone https://github.com/imhlq/oni-yet-another-precision-pipette.git
-cd oni-yet-another-precision-pipette
-```
+Paused consecutive transfers, both directions of map/conduit transfer, and reloading a *held sample* still need gameplay verification. If the game reports an uncertain transfer, exit without saving and reload a pre-transfer backup.
 
-On Windows, run the following in PowerShell, adjusting the Steam library path.
+## Build from source
 
-```powershell
-.\build.ps1 -ManagedDir 'D:\SteamLibrary\steamapps\common\OxygenNotIncluded\OxygenNotIncluded_Data\Managed'
-```
+Use .NET SDK 8 or newer and the game's `OxygenNotIncluded_Data/Managed` directory. On Windows run `.\build.ps1 -ManagedDir 'path\to\Managed'`; on Linux or macOS run `bash build.sh /path/to/Managed`. Both produce `dist/YAPP-install.zip`.
 
-On Linux or macOS, run `bash build.sh /path/to/OxygenNotIncluded_Data/Managed`.
-
-1. Exit the game and extract `dist/YAPP-install.zip`.
-2. Copy the extracted `OniPrecision` folder into the game's user-data `mods/Local` directory. On Windows the usual destination is `Documents\Klei\OxygenNotIncluded\mods\Local\OniPrecision`. The DLL and both YAML files belong directly inside that folder.
-3. Enable **Yet Another Precision Pipette (YAPP)** in the Mods menu, restart when prompted, and load a copy of your colony for the first run.
-
-## Compatibility and saves
-
-On Moono with game build 764025, a copied colony loaded and the native oxygen tooltip showed the element, type, mass, and temperature after 15 rounds of switching between liquid and gas overlays. **Paused consecutive transfers, map-to-conduit transfers in both directions, and reloading a held sample still need in-game verification.**
-
-Pipe transfers check the mass and germ counts actually received. A confirmed partial delivery leaves the remainder in the pipette. If the game returns an uncertain result, YAPP locks further transfers. Exit without saving and reload a pre-transfer backup in that case. Autosave and save-and-quit coverage still need verification. When upgrading from v0.2, finish outstanding transfers and keep a separate backup.
-
-## Developer checks
-
-```sh
-dotnet run --project tests/TransferPlan.Tests.csproj -c Release
-dotnet run --project tests/TransferPlan.Tests.csproj -c Release -- --stress
-dotnet run --project tests/adapter/Adapter.Tests.csproj -c Release
-dotnet run --project tests/references/References.Tests.csproj -c Release -- /path/to/Assembly-CSharp.dll
-```
-
-The stress run exercises one million randomized planner inputs. Adapter tests exercise transfer control flow with simulated game interfaces. The reference check inspects the installed game's assembly metadata. For observations inside a running colony, see the [optional read-only map probe](diagnostics/map-probe/README.md).
-
-## Automated builds and releases
-
-Pull requests and pushes to `main` run the tests and build the install ZIP. Download the `yapp-install` artifact from a successful run on the [Actions page](https://github.com/imhlq/oni-yet-another-precision-pipette/actions/workflows/release.yml) and extract the inner `YAPP-install.zip`.
-
-To publish a version, commit its version number in `mod_info.yaml` and push the matching `vX.Y.Z` tag. After the tagged build passes, the workflow publishes `YAPP-install.zip` on the [Releases page](https://github.com/imhlq/oni-yet-another-precision-pipette/releases).
+GitHub Actions runs the randomized planner stress test, adapter scenarios, and assembly reference checks before packaging. Pushing a tag matching `mod_info.yaml` publishes the tested ZIP. [Build workflow](.github/workflows/release.yml) · [Map diagnostics](diagnostics/map-probe/README.md)

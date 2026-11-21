@@ -1,3 +1,3 @@
 title: Yet Another Precision Pipette (YAPP)
-description: 点击取液管即可在地图方格取液、滴液，另附定量管道转移面板。
+description: 在地图与管道之间定量取放液体和气体。两支滴管分别记住剂量和单位，只向选中的格子投放。
 staticID: Richard.OniPrecision

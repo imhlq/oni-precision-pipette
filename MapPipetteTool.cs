@@ -58,7 +58,7 @@ namespace OniPrecision
             refreshAt = Time.unscaledTime + .2f;
             canPick = Owner.CanPick(cell, out _, out _, out _);
             canDrop = Owner.HasMapDose && Owner.CanDrop(cell);
-            heldCaption = Owner.HasMapDose ? Owner.SampleCaption + (canDrop ? " · 可放置" : " · 不可放置") : null;
+            heldCaption = Owner.HasMapDose ? Owner.SampleCaption + (canDrop ? PipetteText.Get(" · Can dispense", " · 可放置") : PipetteText.Get(" · Cannot dispense", " · 不可放置")) : null;
         }
 
         internal void InvalidatePreview() => refreshAt = 0;
@@ -273,13 +273,14 @@ namespace OniPrecision
         private static readonly Sprite[] menuIcons = new Sprite[2];
         internal static void RegisterResearch()
         {
+            PipetteText.Chinese = Localization.GetCurrentLanguageCode()?.StartsWith("zh", StringComparison.OrdinalIgnoreCase) == true;
             foreach(var phase in new[]{FluidPhase.Liquid,FluidPhase.Gas})
             {
                 string id = "YAPP."+phase;
                 var tech=Db.Get().Techs.TryGet(ToolTech(phase));
                 if (tech==null || Db.Get().TechItems.TryGet(id)!=null) continue;
                 tech.AddUnlockedItemIDs(id);
-                Db.Get().TechItems.AddTechItem(id,ToolLabel(phase),"在地图与管道之间定量取放。",(a,b)=>ToolSprite(phase));
+                Db.Get().TechItems.AddTechItem(id,ToolLabel(phase),PipetteText.Get("Transfer measured samples between cells and conduits.", "在地图与管道之间定量取放。"),(a,b)=>ToolSprite(phase));
             }
         }
 
@@ -345,16 +346,14 @@ namespace OniPrecision
             tip.tooltipPositionOffset = new Vector2(4, 0);
             tip.ClearMultiStringTooltip();
             tip.AddMultiStringTooltip(title, __instance.buildingToolTipSettings.BuildButtonName);
-            string material = STRINGS.UI.FormatAsLink(gas ? "气体" : "液体", gas ? "ELEMENTSGAS" : "ELEMENTSLIQUID");
-            tip.AddMultiStringTooltip("在地图方格和管道之间定量转移" + material + "。左键长按取样，右键长按放置。",
+            string material = STRINGS.UI.FormatAsLink(gas ? PipetteText.Get("gas", "气体") : PipetteText.Get("liquid", "液体"), gas ? "ELEMENTSGAS" : "ELEMENTSLIQUID");
+            tip.AddMultiStringTooltip(PipetteText.Get("Transfer measured amounts of ", "在地图方格和管道之间定量转移") + material + PipetteText.Get(" between cells and conduits. Hold left to collect or right to dispense.", "。左键长按取样，右键长按放置。"),
                 __instance.buildingToolTipSettings.BuildButtonDescription);
         }
 
         private MapPipetteTool mapTool;
         private bool cursorPipe;
         private FluidPhase cursorPhase = FluidPhase.Liquid;
-        private int calibration = 2;
-        private static readonly double[] PresetKg = { 1e-8, 1e-5, .01, 10 };
         private HashedString priorView, appliedView;
         private bool ownsView;
 
@@ -397,21 +396,20 @@ namespace OniPrecision
                 cursorPipe = overlay.mode == OverlayModes.GasConduits.ID || overlay.mode == OverlayModes.LiquidConduits.ID;
                 if (cursorPipe && !InFlight)
                 {
-                    cursorPhase = overlay.mode == OverlayModes.GasConduits.ID ? FluidPhase.Gas : FluidPhase.Liquid;
+                    RestoreDose(overlay.mode == OverlayModes.GasConduits.ID ? FluidPhase.Gas : FluidPhase.Liquid);
                     SelectReservoir(cursorPhase);
                 }
             }
             float wheel = Input.mouseScrollDelta.y;
-            if (wheel != 0 && OverDoseControl()) { ScrollDose(wheel); return; }
+            if (wheel != 0 && !ControlHeld && OverDoseControl()) { ScrollDose(wheel); return; }
             if ((amount != null && amount.isFocused) || (degrees != null && degrees.isFocused)) return;
             if (Input.GetKeyDown(KeyCode.Tab)) ChangeView(!cursorPipe);
             if (Input.GetKeyDown(KeyCode.BackQuote)) ChangeView(false);
-            if (wheel != 0 && ControlHeld)
+            if (wheel != 0 && ControlHeld && !InFlight)
             {
                 mapTool.InvalidatePreview();
                 mapTool.CancelHold();
-                calibration = (calibration + (wheel > 0 ? 1 : -1) + PresetKg.Length) % PresetKg.Length;
-                ApplyPreset();
+                ApplyPreset((unitIndex + (wheel > 0 ? 1 : -1) + Units.Length) % Units.Length);
             }
         }
 
@@ -428,7 +426,7 @@ namespace OniPrecision
         private int mapTicket;
         internal bool FullDose => heldKg >= ConfiguredKg;
         internal float StoredMass => heldKg;
-        internal string SampleCaption => "管中：" + ElementLoader.FindElementByHash((SimHashes)heldHash)?.name +
+        internal string SampleCaption => PipetteText.Get("Held: ", "管中：") + ElementLoader.FindElementByHash((SimHashes)heldHash)?.name +
             " · " + DescribeDose(heldKg) + " · " + GameUtil.GetFormattedTemperature(originalK);
         private string CursorDrop(int cell, out FluidSample target, out float kelvin)
         {
@@ -436,13 +434,13 @@ namespace OniPrecision
             string refusal=DropRefusal(cell,cursorPipe,cursorPhase,out target);
             if(refusal!=null) return refusal;
             if(sameOnly && target.Phase!=FluidPhase.Vacuum && target.Element!=heldHash)
-                return "仅允许同类：请选择空格或同元素目标。";
+                return PipetteText.Get("Choose an empty cell or the same element.", "仅允许同类：请选择空格或同元素目标。");
             if(!tempered) return null;
             if(!Unlocked(TechId) || heldKg>ThermalMaxKg || !TryNumber(temperatureText,out double c))
-                return "变温需要温度调节科技，有效温度及不超过 20 g 的样本。";
+                return PipetteText.Get("Adjusting temperature requires research, a valid temperature and at most 20 g.", "变温需要温度调节科技，有效温度及不超过 20 g 的样本。");
             kelvin=(float)(c+273.15);
             if(!(kelvin>0 && kelvin<=9999) || !WithinPhase(ElementLoader.FindElementByHash((SimHashes)heldHash),kelvin))
-                return "温度无效或会导致相变。";
+                return PipetteText.Get("Invalid temperature or phase change.", "温度无效或会导致相变。");
             return null;
         }
         internal bool CanDrop(int cell) => CursorDrop(cell,out _,out _) == null;
@@ -456,14 +454,13 @@ namespace OniPrecision
         {
             if (InFlight || invalidBuffer || !Unlocked(ToolTech(phase))) return;
             SelectReservoir(phase);
+            RestoreDose(phase);
             bool active = mapTool != null && PlayerController.Instance.ActiveTool == mapTool;
             if (active)
             {
-                cursorPhase = phase;
                 ChangeView(cursorPipe);
                 return;
             }
-            cursorPhase = phase;
             ToggleMapTool();
         }
 
@@ -488,7 +485,7 @@ namespace OniPrecision
             priorView = OverlayScreen.Instance == null ? OverlayModes.None.ID : OverlayScreen.Instance.mode;
             controller.ActivateTool(mapTool);
             ChangeView(priorView == OverlayModes.GasConduits.ID || priorView == OverlayModes.LiquidConduits.ID);
-            status = HasMapDose ? "右键长按放出" : "左键长按取样";
+            status = HasMapDose ? PipetteText.Get("Hold right to dispense", "右键长按放出") : PipetteText.Get("Hold left to collect", "左键长按取样");
         }
 
         internal void ClickMap(int cell, bool drop)
@@ -497,7 +494,7 @@ namespace OniPrecision
             float before = heldKg;
             if (cursorPipe && OverlayScreen.Instance != null && OverlayScreen.Instance.mode !=
                 (cursorPhase == FluidPhase.Gas ? OverlayModes.GasConduits.ID : OverlayModes.LiquidConduits.ID))
-            { status = "当前管道视图与样本类型不符，请切换视图。"; return; }
+            { status = PipetteText.Get("Switch to the matching conduit overlay.", "当前管道视图与样本类型不符，请切换视图。"); return; }
             FluidSample sample;
             TransferPlan plan = default;
             float dose = 0;
@@ -517,11 +514,11 @@ namespace OniPrecision
             else if (!CanPick(cell, out sample, out dose, out plan)) return;
             var element = ElementLoader.FindElementByHash((SimHashes)(drop ? heldHash : sample.Element));
             if (element == null || (cursorPhase == FluidPhase.Liquid ? !element.IsLiquid : !element.IsGas))
-            { status = drop ? "当前样本请用管道面板投放。" : "此格没有对应流体。"; return; }
+            { status = drop ? PipetteText.Get("Use the conduit panel for this sample.", "当前样本请用管道面板投放。") : PipetteText.Get("No matching fluid in this cell.", "此格没有对应流体。"); return; }
             if (cursorPipe)
             {
                 mode = cursorPhase;
-                if (TakePipeSample(cell, sample, plan)) status = "已取 " + DescribeDose(heldKg);
+                if (TakePipeSample(cell, sample, plan)) status = PipetteText.Get("Collected ", "已取 ") + DescribeDose(heldKg);
                 mapTool.ConfirmTransfer(before, drop);
                 return;
             }
@@ -529,7 +526,7 @@ namespace OniPrecision
             inFlight = true;
             mapPending = true;
             mapTool.InvalidatePreview();
-            status = Running() ? (drop ? "正在投放…" : "正在取样…") : "已提交，等待模拟器确认。";
+            status = Running() ? (drop ? PipetteText.Get("Dispensing…", "正在投放…") : PipetteText.Get("Collecting…", "正在取样…")) : PipetteText.Get("Waiting for the simulation.", "已提交，等待模拟器确认。");
             uncertainContext = (drop ? "map emit " : "map consume ") + cell;
             bool Pending() => this != null && Current == this && mapPending && ticket == mapTicket;
             void Complete()
@@ -553,7 +550,7 @@ namespace OniPrecision
                     var handle = Game.Instance.massEmitCallbackManager.Add((info, _) => {
                         if (!Pending()) return;
                         if (info.suceeded != 0) FinishEmit(false, deliveryK);
-                        else status = "目标格拒绝滴液，样本仍在管中。";
+                        else status = PipetteText.Get("Cell rejected delivery. Sample retained.", "目标格拒绝滴液，样本仍在管中。");
                         Complete();
                     }, null, nameof(MapPipetteTool));
                     SimMessages.EmitMass(cell, ElementLoader.GetElementIndex(element.id), heldKg,
@@ -569,15 +566,15 @@ namespace OniPrecision
                                 (int)ElementLoader.elements[(int)info.elemIdx].id,
                                 info.diseaseIdx, info.diseaseCount, cell, false);
                             mode = cursorPhase;
-                            status = "已取 " + DescribeDose(heldKg) + "，右键长按放出。";
+                            status = PipetteText.Get("Collected ", "已取 ") + DescribeDose(heldKg) + PipetteText.Get(". Hold right to dispense.", "，右键长按放出。");
                         }
-                        else status = "未取到液体，请重新选格。";
+                        else status = PipetteText.Get("No sample collected. Choose another cell.", "未取到液体，请重新选格。");
                         Complete();
                     }, null, nameof(MapPipetteTool));
                     SimMessages.ConsumeMass(cell, element.id, dose, (byte)1, (byte)1, handle.index);
                 }
             }
-            catch (Exception error) { mapPending = false; Quarantine("地图取放异常", error); }
+            catch (Exception error) { mapPending = false; Quarantine(PipetteText.Get("Map transfer error", "地图取放异常"), error); }
         }
     }
 }

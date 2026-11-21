@@ -6,6 +6,12 @@ using UnityEngine;
 
 namespace OniPrecision
 {
+    internal static class PipetteText
+    {
+        internal static bool Chinese;
+        internal static string Get(string english, string chinese) => Chinese ? chinese : english;
+    }
+
     public sealed partial class PrecisionMod : KMod.UserMod2
     {
         public override void OnLoad(Harmony harmony)
@@ -110,9 +116,7 @@ namespace OniPrecision
         private bool tempered, inFlight, sourcePipe = true, targetPipe = true;
         private int source = -1, target = -1, unitIndex = 2;
         private FluidPhase mode = FluidPhase.Gas;
-        private string massText = "10", temperatureText = "-25", status = "请选择起点和目标格。";
-        private static readonly string[] Phases = { "移气管", "移液管" };
-        private static readonly string[] EndpointKinds = { "地图", "管道" };
+        private string massText = "10", temperatureText = "-25", status = PipetteText.Get("Select the source and destination cells.", "请选择起点和目标格。");
         private static string Micrograms => STRINGS.UI.UNITSUFFIXES.MASS.MICROGRAM.ToString().Trim();
         private static readonly string[] Units = { Micrograms, STRINGS.UI.UNITSUFFIXES.MASS.MILLIGRAM.ToString().Trim(),
             STRINGS.UI.UNITSUFFIXES.MASS.GRAM.ToString().Trim(), STRINGS.UI.UNITSUFFIXES.MASS.KILOGRAM.ToString().Trim() };
@@ -132,17 +136,17 @@ namespace OniPrecision
             if (mapPending) { uncertain = true; mapPending = false; }
             if (uncertain)
             {
-                status = "转移结果不确定：禁止重试和保存。请退出并读取操作前存档。 " + uncertainContext;
+                status = PipetteText.Get("Transfer result unknown. Reload a pre-transfer save without saving. ", "转移结果不确定：禁止重试和保存。请退出并读取操作前存档。 ") + uncertainContext;
                 BlockNativeSave();
             }
             else if (invalidBuffer)
-                status = "旧缓冲数据无效：原样保留并禁用转移；请恢复备份。";
+                status = PipetteText.Get("Invalid saved sample. Transfers disabled. Restore a backup.", "旧缓冲数据无效：原样保留并禁用转移；请恢复备份。");
             else if (heldKg > 0)
             {
                 mode = ElementLoader.FindElementByHash((SimHashes)heldHash)?.IsLiquid == true
                     ? FluidPhase.Liquid : FluidPhase.Gas;
-                status = originVersion == 1 ? "已恢复样本。请选择兼容管道投放，或退回已验证原管道。" :
-                    "已恢复旧缓冲。禁止自动退回；请选择兼容管道投放（可用原温）。";
+                status = originVersion == 1 ? PipetteText.Get("Sample restored. Select a compatible conduit to dispense or return it to its verified source.", "已恢复样本。请选择兼容管道投放，或退回已验证原管道。") :
+                    PipetteText.Get("Legacy sample restored. Select a compatible conduit for delivery at the original temperature.", "已恢复旧缓冲。禁止自动退回；请选择兼容管道投放（可用原温）。");
             }
         }
 
@@ -171,7 +175,7 @@ namespace OniPrecision
             uncertain = true;
             BlockNativeSave();
             inFlight = false;
-            status = reason + "。结果不确定：禁止重试和保存；请退出并读取操作前存档。";
+            status = reason + PipetteText.Get(". Transfer result unknown. Exit without saving and reload a pre-transfer save.", "。结果不确定：禁止重试和保存；请退出并读取操作前存档。");
             Debug.LogError("[YAPP] " + status + " " + uncertainContext + " " + error);
         }
 
@@ -213,15 +217,15 @@ namespace OniPrecision
         {
             switch (reason)
             {
-                case TransferRejection.SameCell: return "拒绝：起点和目标不能是同一格。";
-                case TransferRejection.IncorrectSourcePhase: return "拒绝：起点元素不是所选的气体或液体。";
-                case TransferRejection.IncompatibleTarget: return "拒绝：目标格有异种元素，不会覆盖。";
-                case TransferRejection.InsufficientSource: return "拒绝：起点的量不足。";
-                case TransferRejection.InvalidAmount: return "拒绝：气体范围 10 " + Micrograms + "–1 " + Units[3] + "；液体范围 1 " + Units[1] + "–10 " + Units[3] + "。";
+                case TransferRejection.SameCell: return PipetteText.Get("Choose different source and destination cells.", "拒绝：起点和目标不能是同一格。");
+                case TransferRejection.IncorrectSourcePhase: return PipetteText.Get("The source does not match the selected phase.", "拒绝：起点元素不是所选的气体或液体。");
+                case TransferRejection.IncompatibleTarget: return PipetteText.Get("The target contains a different element.", "拒绝：目标格有异种元素，不会覆盖。");
+                case TransferRejection.InsufficientSource: return PipetteText.Get("Insufficient mass at the source.", "拒绝：起点的量不足。");
+                case TransferRejection.InvalidAmount: return PipetteText.Get("Gas range: 10 ", "拒绝：气体范围 10 ") + Micrograms + "–1 " + Units[3] + PipetteText.Get(". Liquid range: 1 ", "；液体范围 1 ") + Units[1] + "–10 " + Units[3] + "。";
                 case TransferRejection.InvalidTemperature:
-                case TransferRejection.TemperatureLocked: return "拒绝：温度无效或未解锁。";
-                case TransferRejection.Precision: return "拒绝：该剂量无法精准记账；试着从质量更小的格子取样。";
-                default: return "拒绝：格子状态无效。";
+                case TransferRejection.TemperatureLocked: return PipetteText.Get("Temperature invalid or locked.", "拒绝：温度无效或未解锁。");
+                case TransferRejection.Precision: return PipetteText.Get("This dose cannot be represented accurately. Try a lighter source.", "拒绝：该剂量无法精准记账；试着从质量更小的格子取样。");
+                default: return PipetteText.Get("Invalid cell state.", "拒绝：格子状态无效。");
             }
         }
     }
