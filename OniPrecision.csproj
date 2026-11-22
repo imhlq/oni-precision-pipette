@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets/*.rgba" LogicalName="YAPP.%(Filename).rgba" />
-    <Compile Include="TransferPlan.cs;PrecisionMod.cs;ConduitTransfer.cs;NativePanel.cs;MapPipetteTool.cs;PipeAccounting.cs" />
+    <Compile Include="TransferPlan.cs;PrecisionMod.cs;ConduitTransfer.cs;NativePanel.cs;DuplicantGrabTool.cs;MapPipetteTool.cs;PipeAccounting.cs" />
     <Reference Include="Assembly-CSharp;Assembly-CSharp-firstpass;0Harmony;UnityEngine.CoreModule;UnityEngine.UI;UnityEngine.UIModule;UnityEngine.InputLegacyModule;Unity.TextMeshPro;UnityEngine.TextRenderingModule">
       <HintPath>$(OniManagedDir)/%(Identity).dll</HintPath>
       <Private>false</Private>

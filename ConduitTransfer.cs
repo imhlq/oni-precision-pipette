@@ -102,10 +102,10 @@ namespace OniPrecision
             dose *= KgPerUnit[unitIndex];
             double? setC = null;
             bool unlock = ResearchDone();
-            if (tempered)
+            if (tempered && !OverTemperatureLimit((float)dose))
             {
-                if (!unlock || !TryNumber(temperatureText, out var temp) || dose > ThermalMaxKg)
-                return PipetteText.Get("Temperature locked, invalid or dose exceeds 20 g.", "拒绝：变温未解锁、温度无效，或剂量超过 20 g。");
+                if (!unlock || !TryNumber(temperatureText, out var temp))
+                return PipetteText.Get("Temperature control is locked or the temperature is invalid.", "拒绝：变温未解锁或温度无效。");
                 setC = temp;
             }
 
@@ -213,10 +213,10 @@ namespace OniPrecision
             return PipetteText.Get("Unknown origin. Choose a compatible conduit and use the original temperature.", "拒绝：旧缓冲或原世界无法确认。请选择兼容管道按原温投放。");
             if (!dstPipe)
             return PipetteText.Get("Choose a compatible conduit. Sample retained.", "拒绝：地图投放和原格退回已禁用。缓冲保留；可投放至兼容管道。");
-            if (!returnToSource && !originalTemperature && outputK != originalK && (!ResearchDone() || heldKg > ThermalMaxKg))
-            return PipetteText.Get("Changing temperature requires research and at most 20 g. Return at the original temperature.", "拒绝：变温需研究解锁且最多 20 g。可按原温退回管道。");
+            if (!returnToSource && !originalTemperature && outputK != originalK && !ResearchDone())
+            return PipetteText.Get("Changing temperature requires research. Return at the original temperature.", "拒绝：变温需研究解锁。可按原温退回管道。");
             element = ElementLoader.FindElementByHash((SimHashes)heldHash);
-            temperature = returnToSource || originalTemperature ? originalK : outputK;
+            temperature = returnToSource || originalTemperature || OverTemperatureLimit(heldKg) ? originalK : outputK;
             if (germCount < 0 || (germCount > 0 && germIndex == byte.MaxValue) ||
                 element == null || (!element.IsGas && !element.IsLiquid) ||
                 !(temperature > 0) || !WithinPhase(element, temperature))

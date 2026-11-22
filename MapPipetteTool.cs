@@ -6,10 +6,47 @@ namespace OniPrecision
 {
     public sealed partial class PrecisionMod
     {
+        private const string TemperatureOptionKey = "Richard.OniPrecision.UnlimitedTemperatureMass";
+
+        private static void AddTemperatureOption(System.Collections.IList ___displayedMods)
+        {
+            foreach (var entry in ___displayedMods)
+            {
+                var type = entry.GetType();
+                int index = (int)AccessTools.Field(type, "mod_index").GetValue(entry);
+                if (Global.Instance.modManager.mods[index].staticID != "Richard.OniPrecision") continue;
+                var row = (RectTransform)AccessTools.Field(type, "rect_transform").GetValue(entry);
+                var manage = row.GetComponent<HierarchyReferences>().GetReference<KButton>("ManageButton");
+                var option = UnityEngine.Object.Instantiate(manage, manage.transform.parent);
+                option.transform.SetSiblingIndex(manage.transform.GetSiblingIndex());
+                option.isInteractable = true;
+                var label = option.GetComponentInChildren<LocText>();
+                bool chinese = Localization.GetCurrentLanguageCode()?.StartsWith("zh", StringComparison.OrdinalIgnoreCase) == true;
+                void Refresh()
+                {
+                    label.text = chinese ? "解除温控限重：" + (FluidPipette.UnlimitedTemperatureMass ? "开" : "关")
+                        : "Unlimited temp. mass: " + (FluidPipette.UnlimitedTemperatureMass ? "On" : "Off");
+                }
+                option.GetComponent<ToolTip>().toolTip = chinese ? "允许为超过 20 g 的样本指定温度。仍需完成温度调节研究。"
+                    : "Allow temperature adjustment above 20 g. Temperature Modulation research is still required.";
+                option.onClick += () => {
+                    FluidPipette.UnlimitedTemperatureMass = !FluidPipette.UnlimitedTemperatureMass;
+                    PlayerPrefs.SetInt(TemperatureOptionKey, FluidPipette.UnlimitedTemperatureMass ? 1 : 0);
+                    PlayerPrefs.Save();
+                    Refresh();
+                };
+                Refresh();
+                break;
+            }
+        }
+
         static partial void InstallZoomFilter(Harmony harmony)
         {
-            harmony.Patch(AccessTools.DeclaredMethod(typeof(PlanScreen),"BuildButtonList"),
-                postfix:new HarmonyMethod(typeof(FluidPipette),nameof(FluidPipette.InstallCategoryButton)));
+            FluidPipette.UnlimitedTemperatureMass = PlayerPrefs.GetInt(TemperatureOptionKey, 0) != 0;
+            harmony.Patch(AccessTools.DeclaredMethod(typeof(ModsScreen), "BuildDisplay"),
+                postfix: new HarmonyMethod(typeof(PrecisionMod), nameof(AddTemperatureOption)));
+            harmony.Patch(AccessTools.DeclaredMethod(typeof(FallMonitor.Instance), nameof(FallMonitor.Instance.UpdateFalling)),
+                prefix: new HarmonyMethod(typeof(DuplicantGrabTool), nameof(DuplicantGrabTool.AllowFallUpdate)));
             harmony.Patch(AccessTools.DeclaredMethod(typeof(Db),"Initialize"),
                 postfix:new HarmonyMethod(typeof(FluidPipette),nameof(FluidPipette.RegisterResearch)));
             harmony.Patch(AccessTools.DeclaredMethod(typeof(HoverTextDrawer), nameof(HoverTextDrawer.EndDrawing), Type.EmptyTypes),
@@ -187,11 +224,18 @@ namespace OniPrecision
             RefreshCursor();
         }
 
+        internal bool Holding => heldCell >= 0;
         internal void CancelHold() { heldCell = -1; }
 
         internal void AdvanceHold()
         {
             if (UsePanelCursor()) return;
+            if (Owner.AutoPipetteActive && heldCell < 0 && hasFocus && Application.isFocused)
+            {
+                // Alt-modified clicks may not be dispatched as Action.MouseLeft/MouseRight.
+                if (Input.GetMouseButtonDown(0)) BeginHold(Camera.main.ScreenToWorldPoint(KInputManager.GetMousePos()), false);
+                else if (Input.GetMouseButtonDown(1)) BeginHold(Camera.main.ScreenToWorldPoint(KInputManager.GetMousePos()), true);
+            }
             if (heldCell < 0) { RefreshCursor(); return; }
             int hovered = Grid.PosToCell(Camera.main.ScreenToWorldPoint(KInputManager.GetMousePos()));
             Preview(hovered);
@@ -258,97 +302,34 @@ namespace OniPrecision
 
     public sealed partial class FluidPipette
     {
-        private static Sprite ToolSprite(FluidPhase phase)
+        private static Sprite temperatureIcon;
+
+        private static Sprite TemperatureIcon()
         {
-            int index = phase == FluidPhase.Gas ? 1 : 0;
-            if (menuIcons[index] != null) return menuIcons[index];
-            using (var stream = typeof(FluidPipette).Assembly.GetManifestResourceStream(index==1?"YAPP.gas.rgba":"YAPP.liquid.rgba"))
+            if (temperatureIcon != null) return temperatureIcon;
+            const int size = 96;
+            using (var stream = typeof(FluidPipette).Assembly.GetManifestResourceStream("YAPP.temperature.rgba"))
             using (var reader = new System.IO.BinaryReader(stream))
             {
-                var tex = new Texture2D(48,48,TextureFormat.RGBA32,false);
-                tex.LoadRawTextureData(reader.ReadBytes(48*48*4)); tex.Apply();
-                return menuIcons[index]=Sprite.Create(tex,new Rect(0,0,48,48),new Vector2(.5f,.5f));
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+                texture.LoadRawTextureData(reader.ReadBytes(size * size * 4));
+                texture.Apply();
+                temperatureIcon = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(.5f, .5f));
+                return temperatureIcon;
             }
         }
-        private static readonly Sprite[] menuIcons = new Sprite[2];
+
         internal static void RegisterResearch()
         {
             PipetteText.Chinese = Localization.GetCurrentLanguageCode()?.StartsWith("zh", StringComparison.OrdinalIgnoreCase) == true;
-            foreach(var phase in new[]{FluidPhase.Liquid,FluidPhase.Gas})
-            {
-                string id = "YAPP."+phase;
-                var tech=Db.Get().Techs.TryGet(ToolTech(phase));
-                if (tech==null || Db.Get().TechItems.TryGet(id)!=null) continue;
-                tech.AddUnlockedItemIDs(id);
-                Db.Get().TechItems.AddTechItem(id,ToolLabel(phase),PipetteText.Get("Transfer measured samples between cells and conduits.", "在地图与管道之间定量取放。"),(a,b)=>ToolSprite(phase));
-            }
-        }
-
-        internal static void InstallCategoryButton(PlanScreen __instance,
-            System.Collections.Generic.Dictionary<string,GameObject> ___allSubCategoryObjects, GameObject ___planButtonPrefab,
-            bool ___useSubCategoryLayout)
-        {
-            if(!___allSubCategoryObjects.TryGetValue("default",out var group)) return;
-            var grid=group.GetComponent<HierarchyReferences>().GetReference<UnityEngine.UI.GridLayoutGroup>("Grid");
-            var existing=grid.transform.Find("YAPP tool");
-            var info=__instance.ActiveCategoryToggleInfo;
-            var category=info==null ? default(HashedString) : (HashedString)info.userData;
-            bool gas=category==(HashedString)"HVAC";
-            var phase=gas?FluidPhase.Gas:FluidPhase.Liquid;
-            bool visible=(gas || category==(HashedString)"Plumbing") && BuildingGroupScreen.SearchIsEmpty && Unlocked(ToolTech(phase));
-            if(existing!=null) existing.gameObject.SetActive(visible);
-            if(!visible) return;
-            var obj = existing != null ? existing.gameObject :
-                Util.KInstantiateUI(___planButtonPrefab, grid.gameObject, force_active: true);
-            var toggle = obj.GetComponentInChildren<PlanBuildingToggle>(true);
-            if (existing == null)
-            {
-                obj.name = "YAPP tool";
-                toggle.soundPlayer.Enabled = false;
-                toggle.onClick += () =>
-                {
-                    var active = __instance.ActiveCategoryToggleInfo;
-                    if (active == null) return;
-                    var selected = (HashedString)active.userData == (HashedString)"HVAC" ?
-                        FluidPhase.Gas : FluidPhase.Liquid;
-                    __instance.CloseCategoryPanel();
-                    Current?.ChooseCursor(selected);
-                };
-            }
-
-            // Use the two label and icon slots serialized by the game prefab.
-            T Slot<T>(string field) where T : class =>
-                (T)AccessTools.Field(typeof(PlanBuildingToggle), field).GetValue(toggle);
-            string title = STRINGS.UI.FormatAsLink(ToolLabel(phase), "YAPP." + phase);
-            bool gamepad = ScreenResolutionMonitor.UsingGamepadUIMode();
-            foreach (string field in new[] { "text", "text_listView" })
-            {
-                var label = Slot<LocText>(field);
-                label.fontSize = gamepad ? PlanScreen.fontSizeBigMode : PlanScreen.fontSizeStandardMode;
-                label.text = title;
-            }
-            var icon = Slot<UnityEngine.UI.Image>("buildingIcon");
-            var listIcon = Slot<UnityEngine.UI.Image>("buildingIcon_listView");
-            icon.sprite = listIcon.sprite = ToolSprite(phase);
-            icon.material = listIcon.material = __instance.defaultUIMaterial;
-            icon.SetNativeSize();
-            // YAPP ships 48px cursors. Keep their grid footprint legible at building-icon scale.
-            icon.rectTransform.sizeDelta *= gamepad ? .92f : .75f;
-            Slot<UnityEngine.UI.Image>("fgIcon").gameObject.SetActive(false);
-            Slot<MultiToggle>("toggle").ChangeState(0);
-            toggle.SwitchViewMode(___useSubCategoryLayout);
-
-            var tip = Slot<ToolTip>("tooltip");
-            tip.overrideParentObject = __instance.ProductInfoScreen.gameObject.activeSelf ?
-                __instance.ProductInfoScreen.rectTransform() : __instance.buildingGroupsRoot;
-            tip.tooltipPivot = Vector2.zero;
-            tip.parentPositionAnchor = new Vector2(1, 0);
-            tip.tooltipPositionOffset = new Vector2(4, 0);
-            tip.ClearMultiStringTooltip();
-            tip.AddMultiStringTooltip(title, __instance.buildingToolTipSettings.BuildButtonName);
-            string material = STRINGS.UI.FormatAsLink(gas ? PipetteText.Get("gas", "气体") : PipetteText.Get("liquid", "液体"), gas ? "ELEMENTSGAS" : "ELEMENTSLIQUID");
-            tip.AddMultiStringTooltip(PipetteText.Get("Transfer measured amounts of ", "在地图方格和管道之间定量转移") + material + PipetteText.Get(" between cells and conduits. Hold left to collect or right to dispense.", "。左键长按取样，右键长按放置。"),
-                __instance.buildingToolTipSettings.BuildButtonDescription);
+            const string id = "YAPP.TemperatureControl";
+            var db = Db.Get();
+            var tech = db.Techs.TryGet(TechId);
+            if (tech == null || db.TechItems.TryGet(id) != null) return;
+            db.TechItems.AddTechItem(id, PipetteText.Get("Pipette temperature control", "滴管温度控制"),
+                PipetteText.Get("Set the delivery temperature for samples.", "可指定样本的放置温度。"),
+                (a, b) => TemperatureIcon());
+            tech.AddUnlockedItemIDs(id);
         }
 
         private MapPipetteTool mapTool;
@@ -372,6 +353,7 @@ namespace OniPrecision
 
         internal void LeaveCursorView()
         {
+            autoPrevious = null;
             HideParameters();
             var overlay = OverlayScreen.Instance;
             if (ownsView && overlay != null && overlay.mode == appliedView && overlay.mode != priorView)
@@ -397,34 +379,34 @@ namespace OniPrecision
                 if (cursorPipe && !InFlight)
                 {
                     var phase = overlay.mode == OverlayModes.GasConduits.ID ? FluidPhase.Gas : FluidPhase.Liquid;
-                    if (!Unlocked(ToolTech(phase)))
-                    {
-                        ChangeView(false);
-                        return;
-                    }
                     RestoreDose(phase);
                     SelectReservoir(cursorPhase);
                 }
             }
             float wheel = Input.mouseScrollDelta.y;
-            if (wheel != 0 && !ControlHeld && OverDoseControl()) { ScrollDose(wheel); return; }
+            if (wheel != 0 && !DoseModifierHeld && OverDoseControl()) { ScrollDose(wheel); return; }
             if ((amount != null && amount.isFocused) || (degrees != null && degrees.isFocused)) return;
             if (Input.GetKeyDown(KeyCode.Tab)) ChangeView(!cursorPipe);
             if (Input.GetKeyDown(KeyCode.BackQuote)) ChangeView(false);
-            if (wheel != 0 && ControlHeld && !InFlight)
+            if (wheel != 0 && DoseModifierHeld && !InFlight)
             {
                 mapTool.InvalidatePreview();
                 mapTool.CancelHold();
-                ApplyPreset((unitIndex + (wheel > 0 ? 1 : -1) + Units.Length) % Units.Length);
+                bool larger = wheel > 0;
+                double current = TryNumber(massText, out var value) ? value : 10;
+                int next = unitIndex;
+                if (larger ? current >= 10 : current <= 10)
+                    next = (next + (larger ? 1 : -1) + KgPerUnit.Length) % KgPerUnit.Length;
+                ApplyPreset(next);
             }
         }
 
-        private static bool ControlHeld => Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        private static bool DoseModifierHeld => Input.GetKey(KeyCode.LeftAlt);
         internal static void FilterZoom(KButtonEvent __0)
         {
             if (PlayerController.Instance == null ||
                 !(PlayerController.Instance.ActiveTool is MapPipetteTool) || Input.mouseScrollDelta.y == 0 ||
-                (!ControlHeld && (Current == null || !Current.OverDoseControl()))) return;
+                (!DoseModifierHeld && (Current == null || !Current.OverDoseControl()))) return;
             __0.TryConsume(Action.ZoomIn);
             __0.TryConsume(Action.ZoomOut);
         }
@@ -441,9 +423,9 @@ namespace OniPrecision
             if(refusal!=null) return refusal;
             if(sameOnly && target.Phase!=FluidPhase.Vacuum && target.Element!=heldHash)
                 return PipetteText.Get("Choose an empty cell or the same element.", "仅允许同类：请选择空格或同元素目标。");
-            if(!tempered) return null;
-            if(!Unlocked(TechId) || heldKg>ThermalMaxKg || !TryNumber(temperatureText,out double c))
-                return PipetteText.Get("Adjusting temperature requires research, a valid temperature and at most 20 g.", "变温需要温度调节科技，有效温度及不超过 20 g 的样本。");
+            if(!tempered || OverTemperatureLimit(heldKg)) return null;
+            if(!Unlocked(TechId) || !TryNumber(temperatureText,out double c))
+                return PipetteText.Get("Adjusting temperature requires research and a valid temperature.", "变温需要温度调节科技和有效温度。");
             kelvin=(float)(c+273.15);
             if(!(kelvin>0 && kelvin<=9999) || !WithinPhase(ElementLoader.FindElementByHash((SimHashes)heldHash),kelvin))
                 return PipetteText.Get("Invalid temperature or phase change.", "温度无效或会导致相变。");
@@ -456,21 +438,87 @@ namespace OniPrecision
         internal bool CanHold => Editable();
         internal bool HasMapDose => heldKg > 0;
 
-        private void ChooseCursor(FluidPhase phase)
+        private DuplicantGrabTool grabTool;
+        private readonly System.Collections.Generic.List<KSelectable> grabHits = new System.Collections.Generic.List<KSelectable>();
+        private InterfaceTool autoPrevious;
+        private FluidPhase autoPreviousPhase;
+        private bool autoPreviousPipe, autoReturnPending;
+        internal bool AutoPipetteActive => autoPrevious != null || Input.GetKey(KeyCode.LeftAlt);
+
+        private void UpdateAutoSelection()
         {
-            if (InFlight || invalidBuffer || !Unlocked(ToolTech(phase))) return;
+            var controller = PlayerController.Instance;
+            var tool = controller.ActiveTool;
+            if (autoPrevious != null)
+            {
+                autoReturnPending = !Input.GetKey(KeyCode.LeftAlt) || !Application.isFocused;
+                if (!autoReturnPending || mapTool.Holding || inFlight || HasMapDose) return;
+                var previous = autoPrevious;
+                autoPrevious = null;
+                if (tool != mapTool) return;
+                if (previous == mapTool)
+                {
+                    SelectReservoir(autoPreviousPhase);
+                    RestoreDose(autoPreviousPhase);
+                    ChangeView(autoPreviousPipe);
+                }
+                else controller.ActivateTool(previous);
+                return;
+            }
+            if (!Input.GetKeyDown(KeyCode.LeftAlt) || tool == null || !tool.hasFocus || !Editable() ||
+                Input.GetMouseButton(0) || Input.GetMouseButton(1)) return;
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            if ((events != null && events.IsPointerOverGameObject()) || OverParameters() ||
+                (amount != null && amount.isFocused) || (degrees != null && degrees.isFocused)) return;
+
+            if (tool == grabTool) return;
+            var body = DuplicantGrabTool.FindTarget(tool, grabHits, Camera.main.ScreenToWorldPoint(KInputManager.GetMousePos()));
+            if (body != null)
+            {
+                if (grabTool == null)
+                {
+                    var obj = new GameObject("YAPP Duplicant Grab");
+                    obj.SetActive(false);
+                    obj.transform.SetParent(controller.transform, false);
+                    grabTool = obj.AddComponent<DuplicantGrabTool>();
+                }
+                grabTool.Previous = tool;
+                grabTool.Target = body;
+                controller.ActivateTool(grabTool);
+                return;
+            }
+            int cell = Grid.PosToCell(Camera.main.ScreenToWorldPoint(KInputManager.GetMousePos()));
+            if (!VisibleCell(cell) || Grid.IsSolidCell(cell) || Grid.HasDoor[cell] || Grid.Mass[cell] <= 0) return;
+            var element = Grid.Element[cell];
+            if (element == null || !(element.IsLiquid || element.IsGas)) return;
+            var phase = element.IsLiquid ? FluidPhase.Liquid : FluidPhase.Gas;
+            if (tool == mapTool && cursorPhase == phase && !cursorPipe) return;
+            autoPreviousPhase = cursorPhase;
+            autoPreviousPipe = cursorPipe;
+            ChooseCursor(phase, mapOnly: true);
+            if (controller.ActiveTool == mapTool)
+            {
+                autoPrevious = tool;
+                autoReturnPending = false;
+            }
+        }
+
+        private void ChooseCursor(FluidPhase phase, bool mapOnly = false)
+        {
+            if (InFlight || invalidBuffer) return;
+            if (!mapOnly) autoPrevious = null;
             SelectReservoir(phase);
             RestoreDose(phase);
             bool active = mapTool != null && PlayerController.Instance.ActiveTool == mapTool;
             if (active)
             {
-                ChangeView(cursorPipe);
+                ChangeView(!mapOnly && cursorPipe);
                 return;
             }
-            ToggleMapTool();
+            ToggleMapTool(mapOnly);
         }
 
-        private void ToggleMapTool()
+        private void ToggleMapTool(bool mapOnly)
         {
             var controller = PlayerController.Instance;
             if (controller == null) return;
@@ -490,7 +538,7 @@ namespace OniPrecision
             mapTool.Previous = controller.ActiveTool;
             priorView = OverlayScreen.Instance == null ? OverlayModes.None.ID : OverlayScreen.Instance.mode;
             controller.ActivateTool(mapTool);
-            ChangeView(priorView == OverlayModes.GasConduits.ID || priorView == OverlayModes.LiquidConduits.ID);
+            ChangeView(!mapOnly && (priorView == OverlayModes.GasConduits.ID || priorView == OverlayModes.LiquidConduits.ID));
             status = HasMapDose ? PipetteText.Get("Hold right to dispense", "右键长按放出") : PipetteText.Get("Hold left to collect", "左键长按取样");
         }
 

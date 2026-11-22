@@ -10,16 +10,18 @@ For U60, game build **763796** or later. Exit the game, extract `YAPP-install.zi
 
 ## Take a sample
 
-Choose **Plumbing → Liquid Pipette** or **Ventilation → Gas Pipette**. In the current source, each tool unlocks with its corresponding conduit research (`LiquidPiping` or `GasPiping`). The linked v0.15.0 release predates these research gates. The native hover card shows what is in the target cell; the separate sample readout shows the element, mass, and temperature in the pipette.
+From the start of a colony, point at liquid or gas and hold **Left Alt** to use the corresponding pipette. The native hover card shows what is in the target cell; the separate sample readout shows the element, mass, and temperature in the pipette.
 
 | Control | Action |
 | --- | --- |
+| Hold Left Alt | Point at liquid or gas, then press Left Alt to select its pipette. Moving the pointer keeps that selection. Release Alt with a sample to keep the pipette active. It returns to the previous tool once empty and idle. |
+| Left Alt over a Duplicant | Hold left for 0.45 s to grab, then move the pointer to drag slowly. Walls block movement. Release the mouse to let go. |
 | Hold left / right for 0.65 s | Collect / dispense. Release early to cancel. Top up a partial sample with the same element. |
-| Preset button or Ctrl + wheel | Select **10 µg**, **10 mg**, **10 g**, or **10 kg**. For a custom limit, enter 1–1000 and choose a unit. Each tool saves its own amount and unit with the colony. |
+| Preset button or Left Alt + wheel | Select **10 µg**, **10 mg**, **10 g**, or **10 kg**. For a custom limit, enter 1–1000 and click the adjacent unit to cycle it. Each tool saves its own amount and unit with the colony. |
 | Tab / backquote | Toggle the matching conduit overlay / return to the map. You can switch between pickup and delivery. |
 | Esc | Leave the tool and keep the sample. |
 
-Enable **Same element only** to limit delivery to empty or matching targets. Turn it off to drip liquid into air. Samples keep their original temperature by default; after Temperature Modulation research, eligible samples up to 20 g can use a specified delivery temperature.
+Enable **Same element only** to limit delivery to empty or matching targets. Turn it off to drip liquid into air. Samples keep their original temperature by default; after Temperature Modulation research, samples up to 20 g can use a specified delivery temperature. To allow larger samples, enable **Unlimited temp. mass** in the YAPP row of the Mods screen (off by default).
 
 ## Verified in v0.15.0
 

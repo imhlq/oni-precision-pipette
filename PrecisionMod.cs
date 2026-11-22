@@ -66,8 +66,10 @@ namespace OniPrecision
     {
         internal static FluidPipette Current { get; private set; }
         internal bool InFlight => inFlight || uncertain;
+        internal static bool UnlimitedTemperatureMass;
+        private static bool OverTemperatureLimit(float kg) => !UnlimitedTemperatureMass && kg > .02f;
         private const string TechId = "TemperatureModulation";
-        private const double ThermalMaxKg = 0.02;
+
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
         [Serialize] private float heldKg;
@@ -117,9 +119,16 @@ namespace OniPrecision
         private int source = -1, target = -1, unitIndex = 2;
         private FluidPhase mode = FluidPhase.Gas;
         private string massText = "10", temperatureText = "-25", status = PipetteText.Get("Select the source and destination cells.", "请选择起点和目标格。");
-        private static string Micrograms => STRINGS.UI.UNITSUFFIXES.MASS.MICROGRAM.ToString().Trim();
-        private static readonly string[] Units = { Micrograms, STRINGS.UI.UNITSUFFIXES.MASS.MILLIGRAM.ToString().Trim(),
-            STRINGS.UI.UNITSUFFIXES.MASS.GRAM.ToString().Trim(), STRINGS.UI.UNITSUFFIXES.MASS.KILOGRAM.ToString().Trim() };
+        private static string UnitLabel(int index)
+        {
+            switch (index)
+            {
+                case 0: return STRINGS.UI.UNITSUFFIXES.MASS.MICROGRAM.ToString().Trim();
+                case 1: return STRINGS.UI.UNITSUFFIXES.MASS.MILLIGRAM.ToString().Trim();
+                case 2: return STRINGS.UI.UNITSUFFIXES.MASS.GRAM.ToString().Trim();
+                default: return STRINGS.UI.UNITSUFFIXES.MASS.KILOGRAM.ToString().Trim();
+            }
+        }
         private static readonly double[] KgPerUnit = { 1e-9, 1e-6, 1e-3, 1 };
 
         protected override void OnSpawn()
@@ -207,10 +216,10 @@ namespace OniPrecision
 
         private static string DescribeDose(float kg)
         {
-            return kg < 1e-6f ? (kg * 1e9).ToString("0.###", Invariant) + " " + Micrograms :
-                kg < 1e-3f ? (kg * 1e6).ToString("0.###", Invariant) + " " + Units[1] :
-                kg < 1 ? (kg * 1e3).ToString("0.###", Invariant) + " " + Units[2] :
-                kg.ToString("0.###", Invariant) + " " + Units[3];
+            return kg < 1e-6f ? (kg * 1e9).ToString("0.###", Invariant) + " " + UnitLabel(0) :
+                kg < 1e-3f ? (kg * 1e6).ToString("0.###", Invariant) + " " + UnitLabel(1) :
+                kg < 1 ? (kg * 1e3).ToString("0.###", Invariant) + " " + UnitLabel(2) :
+                kg.ToString("0.###", Invariant) + " " + UnitLabel(3);
         }
 
         private static string RejectLabel(TransferRejection reason)
@@ -221,7 +230,7 @@ namespace OniPrecision
                 case TransferRejection.IncorrectSourcePhase: return PipetteText.Get("The source does not match the selected phase.", "拒绝：起点元素不是所选的气体或液体。");
                 case TransferRejection.IncompatibleTarget: return PipetteText.Get("The target contains a different element.", "拒绝：目标格有异种元素，不会覆盖。");
                 case TransferRejection.InsufficientSource: return PipetteText.Get("Insufficient mass at the source.", "拒绝：起点的量不足。");
-                case TransferRejection.InvalidAmount: return PipetteText.Get("Gas range: 10 ", "拒绝：气体范围 10 ") + Micrograms + "–1 " + Units[3] + PipetteText.Get(". Liquid range: 1 ", "；液体范围 1 ") + Units[1] + "–10 " + Units[3] + "。";
+                case TransferRejection.InvalidAmount: return PipetteText.Get("Gas range: 10 ", "拒绝：气体范围 10 ") + UnitLabel(0) + "–1 " + UnitLabel(3) + PipetteText.Get(". Liquid range: 1 ", "；液体范围 1 ") + UnitLabel(1) + "–10 " + UnitLabel(3) + "。";
                 case TransferRejection.InvalidTemperature:
                 case TransferRejection.TemperatureLocked: return PipetteText.Get("Temperature invalid or locked.", "拒绝：温度无效或未解锁。");
                 case TransferRejection.Precision: return PipetteText.Get("This dose cannot be represented accurately. Try a lighter source.", "拒绝：该剂量无法精准记账；试着从质量更小的格子取样。");

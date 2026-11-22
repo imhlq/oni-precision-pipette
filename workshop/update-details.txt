@@ -1,0 +1,13 @@
+又一款精准滴管（YAPP）0.16.0
+
+• 开局即可使用。指向液体或气体，按住左 Alt 选管；长按左键取样，长按右键投放。管中有样本时，松开 Alt 可以继续取放。水管和通风菜单里的工具入口已移除。
+• 指向复制人时按住左 Alt，再长按左键即可抓取并拖动。暂停时也可移动，松开左键释放。
+• 左 Alt＋滚轮切换四个快捷剂量。控制板上移，数值和单位放在同一行，单位跟随游戏语言。
+• 完成「温度调节」研究后可指定放置温度。默认仅限不超过 20 克的样本；在模组页面开启「解除温控限重」后，更重的样本也可调温。
+
+Yet Another Precision Pipette 0.16.0
+
+• Point at liquid or gas and hold Left Alt to equip a pipette from the start of a colony. Hold left to collect or right to dispense. Release Alt with a sample to keep using the tool. The Plumbing and Ventilation menu entries have been removed.
+• Point at a Duplicant, hold Left Alt, then hold the left mouse button to grab and drag. Works while paused. Release the mouse button to let go.
+• Use Left Alt + wheel to cycle four doses. The raised control panel groups the amount and localized unit on one line.
+• Research Temperature Modulation to set delivery temperature for samples up to 20 g. Enable “Unlimited temp. mass” on the Mods screen to adjust larger samples.
